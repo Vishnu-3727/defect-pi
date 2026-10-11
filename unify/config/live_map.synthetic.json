@@ -1,0 +1,26 @@
+{
+  "_comment": [
+    "Live map for a model trained on the SYNTHETIC datasets only. Lets you exercise",
+    "the whole ONNX -> Pi -> dashboard path before C-MAPSS/FEMTO/XJTU are downloaded:",
+    "",
+    "    UNIFY_LIVE_MAP=config/live_map.synthetic.json uvicorn app:app",
+    "    python edge/fake_node.py --degrade",
+    "",
+    "Delete this once you train on the real datasets — config/live_map.json is the",
+    "one that matters, and shipping a demo config to the Pi would be a bad day."
+  ],
+
+  "ref_dataset": "synthetic",
+  "domain_id": 4,
+
+  "channels": [
+    "synthetic/c0", "synthetic/c1", "synthetic/c2", "synthetic/c3",
+    "synthetic/c4", "synthetic/c5", "synthetic/c6", "synthetic/c7"
+  ],
+
+  "alarm": {
+    "ewma_alpha": 0.3,
+    "threshold": 0.30,
+    "consecutive": 5
+  }
+}

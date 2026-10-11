@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Live map for the real XJTU-SY bearing domain.",
+    "Channels are the primary horizontal and vertical vibration features."
+  ],
+  "ref_dataset": "xjtu",
+  "domain_id": 2,
+  "channels": [
+    "bearing/h_rms",
+    "bearing/h_kurt",
+    "bearing/h_crest",
+    "bearing/v_rms",
+    "bearing/v_kurt",
+    "bearing/v_crest"
+  ],
+  "alarm": {
+    "ewma_alpha": 0.3,
+    "threshold": 0.30,
+    "consecutive": 5
+  }
+}

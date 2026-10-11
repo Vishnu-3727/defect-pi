@@ -1,0 +1,47 @@
+# UNIFY-RUL Quantile Uncertainty Training Configuration.
+# Trains a 3-head prediction model [q10, q50, q90] via Pinball loss.
+
+seed: 42
+
+data:
+  interim_dir: data/interim
+  datasets: [cmapss, femto, xjtu]
+  window: 30
+  stride_train: 1
+  stride_eval: 1
+  val_frac: 0.2
+  balance_datasets: true
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_queries: 1
+  dropout: 0.2
+  attn_dropout: 0.1
+  sensor_vocab: 64
+  n_domains: 8
+  norm: group
+  sigmoid_output: false
+  sensor_self_attention: true
+  residual: true
+
+loss:
+  kind: pinball
+  quantiles: [0.1, 0.5, 0.9]
+  nasa_weight: 0.01
+
+optim:
+  epochs: 25
+  batch_size: 256
+  lr: 5.0e-4
+  weight_decay: 1.0e-4
+  warmup_epochs: 2
+  min_lr: 1.0e-5
+  grad_clip: 1.0
+  early_stop_patience: 10
+  num_workers: 0
+
+out:
+  ckpt: results/quantile/best.pt
+  metrics: results/quantile/metrics.json
+  artifacts: results/quantile/artifacts

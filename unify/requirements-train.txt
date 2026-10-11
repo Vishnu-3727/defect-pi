@@ -1,0 +1,35 @@
+# Laptop / training environment. NONE of this goes on the Pi — see
+# edge/requirements-pi.txt. If you feel the need to install torch on the Pi, the
+# ONNX export step is incomplete.
+
+numpy>=2.0
+pandas>=2.2
+scipy>=1.14
+scikit-learn>=1.5
+pyyaml>=6.0
+matplotlib>=3.9
+
+# PyTorch. The line below installs the CPU build, which is enough to run
+# everything here. For your RTX laptop install the CUDA build instead:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+# then verify:  python -c "import torch; print(torch.cuda.is_available())"  -> True
+# If it prints False you installed the CPU wheel.
+# NB: plain `pip install torch` on Windows resolves to the CPU-only wheel
+# (torch-2.13.0+cpu) and silently trains on the CPU — 80 s/epoch on C-MAPSS
+# instead of seconds, with the GPU idle. Check for the "+cu" suffix, not just
+# that torch imports:
+#   python -c "import torch; print(torch.__version__)"   -> must contain +cu
+# Install the CUDA build explicitly, matching the version so the ONNX export
+# path does not shift underneath you:
+#   pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cu130
+torch>=2.4
+
+# Export toolchain. onnxscript is pulled in by torch>=2.6's exporter machinery
+# even though we force the legacy tracing path — install it or the import fails.
+onnx>=1.17
+onnxscript>=0.1
+onnxruntime>=1.19
+
+# Tests
+pytest>=8.0
+httpx>=0.27

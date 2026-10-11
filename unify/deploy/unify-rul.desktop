@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=UNIFY-RUL Demo
+Comment=Start the RUL prediction demo (stops the defect inspection demo)
+# No quoting, no shell, no xdg-open. The Exec field escapes ; $ " and ' in ways
+# that are easy to get subtly wrong; keeping it to a bare command sidesteps all
+# of it. Conflicts= in the unit file already stops the other demo, and the
+# browser tab on :8000 stays open across switches -- just reload it.
+Exec=systemctl --user start unify-rul.service
+Icon=utilities-system-monitor
+Terminal=false
+StartupNotify=false
+Categories=Utility;

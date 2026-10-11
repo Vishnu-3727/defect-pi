@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "How the live rig's feature packet maps onto the model's trained sensor IDs.",
+    "",
+    "The ESP32 sends rms/kurt/crest per axis — a SUBSET of the 5 features the",
+    "bearing datasets provide. The attention mask handles the missing channels, so",
+    "no retraining is needed. That is the architecture doing its job, and it is",
+    "worth demonstrating in the viva.",
+    "",
+    "Axis mapping: MPU-6050 ax -> bearing horizontal, ay -> bearing vertical,",
+    "az -> axial (which the bearing datasets do not have, so those embeddings stay",
+    "untrained — see the caveat below).",
+    "",
+    "CAVEAT: ref_dataset supplies the normalisation statistics AND the life scale.",
+    "The model never trained on this rig and there is no ground-truth RUL for it,",
+    "so the physical number is an unvalidated transfer. docs/11 §13.1.",
+    "",
+    "Override the whole file with the UNIFY_LIVE_MAP environment variable.",
+    "'channels' must match, in order, what the node actually POSTs."
+  ],
+
+  "ref_dataset": "femto",
+  "domain_id": 1,
+
+  "channels": [
+    "bearing/h_rms", "bearing/h_kurt", "bearing/h_crest",
+    "bearing/v_rms", "bearing/v_kurt", "bearing/v_crest"
+  ],
+
+  "alarm": {
+    "ewma_alpha": 0.3,
+    "threshold": 0.30,
+    "consecutive": 5
+  }
+}

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Stop All Demos
+Comment=Stop every demo and verify nothing is left running
+# Terminal=true on purpose: this one has output worth reading. `demo stop`
+# checks the unit state, surviving processes and the bound port for both
+# projects, and exits nonzero if either is still alive.
+Exec=/home/vishnu/bin/demo stop
+Icon=process-stop
+Terminal=true
+StartupNotify=false
+Categories=Utility;

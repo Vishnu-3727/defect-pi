@@ -1,0 +1,73 @@
+# Per-dataset paths and RUL conventions.
+#
+# THE UNIT PROBLEM (docs/05-preprocessing.md §5.6): the three datasets measure life
+# in cycles, seconds and minutes. The model predicts a DIMENSIONLESS fraction of
+# life in [0,1]; physical units are recovered at inference by multiplying by
+# `life_scale`, which is filled in automatically by the parser as the median
+# capped life over the training units.
+
+cmapss:
+  raw: data/raw/cmapss
+  subsets: [FD001, FD002, FD003, FD004]
+  domain_id: 0
+  unit_of_time: cycle
+  # Piecewise-linear RUL: constant while healthy, linear once degradation shows.
+  # 125 is the field standard (Heimes 2008). Halves RMSE vs uncapped.
+  cap_mode: absolute
+  cap: 125.0
+  drop_constant_sensors: true
+  var_threshold: 1.0e-6
+
+femto:
+  raw: data/raw/femto
+  domain_id: 1
+  unit_of_time: second
+  sample_period_s: 10.0      # one 0.1 s snapshot @ 25.6 kHz every 10 s
+  snapshot_len: 2560
+  fs_hz: 25600
+  # Bearing lives vary 5-20x, so an absolute cap in seconds is meaningless.
+  # Cap as a fraction of that unit's own life instead.
+  cap_mode: fraction
+  cap: 0.7
+
+xjtu:
+  raw: data/raw/xjtu
+  domain_id: 2
+  unit_of_time: minute
+  sample_period_s: 60.0      # one 1.28 s snapshot @ 25.6 kHz every minute
+  snapshot_len: 32768
+  fs_hz: 25600
+  conditions: ["35Hz12kN", "37.5Hz11kN", "40Hz10kN"]
+  cap_mode: fraction
+  cap: 0.7
+
+# Live rig. No run-to-failure labels exist for it — never trained on, only
+# inferred on. See docs/11-realtime-pipeline.md §13.1 for what the number means.
+live:
+  domain_id: 3
+  unit_of_time: minute
+  cap_mode: fraction
+  cap: 0.7
+  life_scale: 120.0          # nominal, for display only. NOT a validated figure.
+
+# Generated on the fly — lets the whole stack run before the ~15 GB of real data
+# is downloaded, and gives CI something deterministic. Never appears in results.
+synthetic:
+  domain_id: 4
+  unit_of_time: step
+  n_units: 60
+  n_sensors: 8
+  cap_mode: fraction
+  cap: 0.7
+  seed: 0
+
+# Same physics, 3 channels instead of 8. Its only job is to force mixed-sensor-count
+# batches so the universality claim is actually exercised during training.
+synthetic_small:
+  domain_id: 5
+  unit_of_time: step
+  n_units: 40
+  n_sensors: 3
+  cap_mode: fraction
+  cap: 0.7
+  seed: 0

@@ -1,0 +1,33 @@
+{
+  "info": {
+    "platform": "Linux-6.12.93+rpt-rpi-2712-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "processor": "",
+    "onnxruntime": "1.30.0",
+    "providers": [
+      "CPUExecutionProvider"
+    ],
+    "model_sha": "a80c367e596a6517",
+    "thermals_before": {
+      "temp_c": "43.3'C",
+      "throttled": "0x0"
+    },
+    "thermals_after": {
+      "temp_c": "43.3'C",
+      "throttled": "0x0"
+    }
+  },
+  "runs": [
+    {
+      "threads": 2,
+      "iters": 100,
+      "sensors": 6,
+      "window": 30,
+      "p50_ms": 0.52,
+      "p95_ms": 0.538,
+      "p99_ms": 0.54,
+      "max_ms": 0.572,
+      "mean_ms": 0.522
+    }
+  ]
+}

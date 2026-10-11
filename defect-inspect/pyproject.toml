@@ -1,0 +1,48 @@
+[project]
+name = "defect-inspect"
+version = "0.1.0"
+description = "Real-time industrial surface defect detection for Raspberry Pi 5"
+requires-python = ">=3.11,<3.13"
+
+# Runtime only. Everything here has an arm64 wheel and runs on the Pi.
+# No torch, no CUDA. See docs/12_onnx_and_runtime.md for why.
+dependencies = [
+    "numpy>=2.0",
+    "opencv-python>=4.10",
+    "onnxruntime>=1.20",
+    "pyyaml>=6.0",
+    "flask>=3.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+# Laptop-only. Used to train and export; never installed on the Pi.
+train = [
+    "ultralytics>=8.3",
+    "torch>=2.7",
+    "torchvision>=0.22",
+    "onnx>=1.17",
+    "onnxslim",
+    "matplotlib>=3.9",
+    "pandas>=2.2",
+]
+# Pi-native GPIO. Fails to build on Windows, so it is kept out of the base set.
+pi = ["lgpio>=0.2"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspector"]
+
+[tool.uv]
+# CUDA build of torch for the RTX 4060. CPU wheels are the default otherwise.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }

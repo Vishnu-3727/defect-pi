@@ -1,0 +1,49 @@
+# UNIFY-RUL Multi-Scale Encoder + Quantile Uncertainty Configuration.
+# Trains with the novel multi-scale temporal encoder (parallel k={3,5,9} branches)
+# and pinball loss for uncertainty quantification.
+
+seed: 42
+
+data:
+  interim_dir: data/interim
+  datasets: [cmapss, femto, xjtu]
+  window: 30
+  stride_train: 1
+  stride_eval: 1
+  val_frac: 0.2
+  balance_datasets: true
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_queries: 1
+  dropout: 0.2
+  attn_dropout: 0.1
+  sensor_vocab: 64
+  n_domains: 8
+  norm: group
+  sigmoid_output: false
+  sensor_self_attention: true
+  residual: false               # not used when encoder_type=multiscale
+  encoder_type: multiscale      # NEW: parallel conv branches k={3,5,9}
+
+loss:
+  kind: pinball
+  quantiles: [0.1, 0.5, 0.9]
+  nasa_weight: 0.01
+
+optim:
+  epochs: 30
+  batch_size: 256
+  lr: 5.0e-4
+  weight_decay: 1.0e-4
+  warmup_epochs: 3
+  min_lr: 1.0e-5
+  grad_clip: 1.0
+  early_stop_patience: 12
+  num_workers: 0
+
+out:
+  ckpt: results/multiscale/best.pt
+  metrics: results/multiscale/metrics.json
+  artifacts: results/multiscale/artifacts

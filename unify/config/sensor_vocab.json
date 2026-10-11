@@ -1,0 +1,36 @@
+{
+  "_comment": [
+    "Global sensor-ID vocabulary. Index into nn.Embedding in the model.",
+    "MUST be identical on the training laptop and on the Pi. Never hard-code these",
+    "IDs anywhere else. 0 is reserved for padding.",
+    "",
+    "Bearing IDs 30-47 are SHARED between FEMTO, XJTU-SY and the live MPU-6050 rig,",
+    "so the deployed model has actually seen those embedding rows during training.",
+    "Live rig maps: ax -> h (radial), ay -> v (radial), az -> a (axial).",
+    "The live node sends only rms/kurt/crest, i.e. a SUBSET of the trained channels —",
+    "the attention mask handles the missing ones. That is the architecture working."
+  ],
+
+  "PAD": 0,
+
+  "cmapss/s1": 1,  "cmapss/s2": 2,  "cmapss/s3": 3,  "cmapss/s4": 4,
+  "cmapss/s5": 5,  "cmapss/s6": 6,  "cmapss/s7": 7,  "cmapss/s8": 8,
+  "cmapss/s9": 9,  "cmapss/s10": 10, "cmapss/s11": 11, "cmapss/s12": 12,
+  "cmapss/s13": 13, "cmapss/s14": 14, "cmapss/s15": 15, "cmapss/s16": 16,
+  "cmapss/s17": 17, "cmapss/s18": 18, "cmapss/s19": 19, "cmapss/s20": 20,
+  "cmapss/s21": 21,
+
+  "bearing/h_rms": 30, "bearing/h_std": 31, "bearing/h_kurt": 32,
+  "bearing/h_skew": 33, "bearing/h_crest": 34, "bearing/h_p2p": 35,
+
+  "bearing/v_rms": 36, "bearing/v_std": 37, "bearing/v_kurt": 38,
+  "bearing/v_skew": 39, "bearing/v_crest": 40, "bearing/v_p2p": 41,
+
+  "bearing/a_rms": 42, "bearing/a_std": 43, "bearing/a_kurt": 44,
+  "bearing/a_skew": 45, "bearing/a_crest": 46, "bearing/a_p2p": 47,
+
+  "bearing/temp": 48,
+
+  "synthetic/c0": 50, "synthetic/c1": 51, "synthetic/c2": 52, "synthetic/c3": 53,
+  "synthetic/c4": 54, "synthetic/c5": 55, "synthetic/c6": 56, "synthetic/c7": 57
+}

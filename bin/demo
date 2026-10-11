@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# One entry point for the two demos on this Pi. systemd already enforces that
+# only one runs (Conflicts= in every unit), so this script does not re-implement
+# that; what it adds is a *verified* stop. "systemctl stop" returning 0 means
+# the unit left the active state -- it does not prove the port is free or that
+# no process survived, and this Pi has four cores that one stray inference
+# thread is enough to ruin.
+set -uo pipefail
+
+declare -A PORT=( [defect-inspect]=5000 [unify-rul]=8000 )
+declare -A DIR=( [defect-inspect]=defect-inspect [unify-rul]=unify )
+ALL="defect-inspect unify-rul"
+
+die() { echo "error: $*" >&2; exit 1; }
+
+usage() {
+    cat <<USAGE
+usage: demo <start|stop|status|open|logs> [name]
+
+  demo start <name>   start one demo; the others are stopped first
+  demo stop [name]    stop one, or all of them when no name is given,
+                      then verify nothing survived
+  demo status         what is running, what is listening, current load
+  demo open <name>    print the URL
+  demo logs <name>    last 40 log lines (why did it fail?)
+
+names: $ALL
+USAGE
+}
+
+check() { [[ -n "${PORT[$1]:-}" ]] || die "unknown demo '$1' (want: $ALL)"; }
+
+# The whole reason this script exists. Three independent checks, because each
+# one catches a different failure: the unit can be inactive while a child
+# survives in another cgroup, a process can be gone while the socket sits in
+# TIME_WAIT, and a wedged one can hold the cores with the unit already "failed".
+verify_stopped() {
+    local name=$1 port=${PORT[$1]} dir=${DIR[$1]} bad=0
+
+    local state
+    state=$(systemctl --user is-active "$name.service" 2>/dev/null)
+    if [[ $state == active || $state == activating || $state == deactivating ]]; then
+        echo "  FAIL unit still $state"; bad=1
+    else
+        echo "  ok   unit $state"
+    fi
+
+    # -f matches the full command line: every one of these processes names its
+    # own project directory in either the interpreter path or the arguments.
+    local procs
+    # Trailing slash: ~/unify must not match ~/unify-rul-edge.
+    procs=$(pgrep -af "$HOME/$dir/" |grep -v "pgrep\|/demo\b" || true)
+    if [[ -n $procs ]]; then
+        echo "  FAIL processes still alive:"; sed 's/^/       /' <<<"$procs"; bad=1
+    else
+        echo "  ok   no processes under ~/$dir"
+    fi
+
+    if ss -tlnH "sport = :$port" | grep -q .; then
+        echo "  FAIL port $port still bound"; bad=1
+    else
+        echo "  ok   port $port free"
+    fi
+
+    return $bad
+}
+
+cmd=${1:-}; name=${2:-}
+
+case "$cmd" in
+start)
+    [[ -n $name ]] || { usage; exit 1; }
+    check "$name"
+    # Conflicts= stops the others, but stop them explicitly first and verify.
+    # Relying on the implicit stop means a demo that fails to die shows up as a
+    # halved frame rate mid-presentation instead of an error here and now.
+    for other in $ALL; do
+        [[ $other == "$name" ]] && continue
+        if [[ $(systemctl --user is-active "$other.service") != inactive ]]; then
+            echo "stopping $other first"
+            systemctl --user stop "$other.service"
+        fi
+    done
+    systemctl --user start "$name.service" || die "$name failed to start (journalctl --user -u $name -n 40)"
+    sleep 3
+    if ss -tlnH "sport = :${PORT[$name]}" | grep -q .; then
+        echo "$name up on http://$(hostname).local:${PORT[$name]}  (or http://$(hostname -I | awk '{print $1}'):${PORT[$name]})"
+    else
+        echo "warning: $name started but nothing is listening on ${PORT[$name]} yet" >&2
+        echo "  journalctl --user -u $name -n 40" >&2
+    fi
+    ;;
+stop)
+    targets=${name:-$ALL}
+    for t in $targets; do
+        check "$t"
+        systemctl --user stop "$t.service"
+    done
+    # The unit is not gone the instant systemctl returns; give the cgroup a
+    # moment before asserting, or the check races the kill it just requested.
+    sleep 2
+    rc=0
+    for t in $targets; do
+        echo "$t:"
+        verify_stopped "$t" || rc=1
+    done
+    if (( rc )); then
+        echo
+        echo "something survived. force it: systemctl --user kill -s KILL <name>.service" >&2
+        exit 1
+    fi
+    echo
+    echo "all clear -- nothing running, nothing listening"
+    ;;
+status)
+    for t in $ALL; do
+        printf '%-16s %-10s port %-5s ' "$t" "$(systemctl --user is-active "$t.service")" "${PORT[$t]}"
+        ss -tlnH "sport = :${PORT[$t]}" | grep -q . && echo "LISTENING" || echo "-"
+    done
+    echo
+    uptime
+    ;;
+open)
+    [[ -n $name ]] || { usage; exit 1; }
+    check "$name"
+    echo "http://$(hostname).local:${PORT[$name]}"
+    echo "http://$(hostname -I | awk '{print $1}'):${PORT[$name]}"
+    ;;
+logs)
+    [[ -n $name ]] || { usage; exit 1; }
+    check "$name"
+    journalctl --user -u "$name.service" -n 40 --no-pager
+    ;;
+*)
+    usage; exit 1 ;;
+esac

@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UNIFY-RUL — Edge Prognostics</title>
+<style>
+  /* Hallmark · audit-fix pass · dashboard · tokens preserved */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root{
+    --bg:#0a0e13; --bg2:#111820; --card:#151d27; --card2:#1a2330; --line:#1e2e3e;
+    --fg:#e6edf5; --dim:#8a9bb0; --dim2:#5c708a;
+    --ok:#22c55e; --ok-bg:rgba(34,197,94,.12); --warn:#f59e0b; --warn-bg:rgba(245,158,11,.12); --bad:#ef4444; --bad-bg:rgba(239,68,68,.12);
+    --accent:#3b82f6; --accent2:#60a5fa; --radius:16px; --radius-sm:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;overflow-x:clip}
+  body{
+    background:
+      radial-gradient(900px 600px at 10% 0%, rgba(59,130,246,.10), transparent 60%),
+      radial-gradient(800px 500px at 95% 10%, rgba(34,197,94,.07), transparent 60%),
+      var(--bg);
+    color:var(--fg);
+    font:14px/1.5 'Inter', system-ui, -apple-system, sans-serif;
+    padding:20px 20px 32px;
+  }
+  a{color:var(--accent2)}
+  /* header */
+  .top{
+    display:flex; gap:16px; align-items:center; justify-content:space-between;
+    max-width:1280px; margin:0 auto 18px; flex-wrap:wrap;
+  }
+  .brand{display:flex; gap:14px; align-items:center}
+  .logo{
+    width:44px; height:44px; border-radius:12px; display:grid; place-items:center;
+    background:linear-gradient(135deg, #1e3a5f 0%, #0f2742 100%); border:1px solid #25406a;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .logo svg{width:26px;height:26px}
+  .brand h1{margin:0; font-size:18px; font-weight:700; letter-spacing:-.02em; line-height:1}
+  .brand p{margin:3px 0 0; font-size:12px; color:var(--dim); font-weight:500; letter-spacing:.02em}
+  .pills{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .pill{
+    display:inline-flex; align-items:center; gap:7px;
+    padding:7px 12px; border-radius:999px; font:600 12px/1 'Inter';
+    border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--dim);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim2);box-shadow:0 0 0 3px rgba(0,0,0,.2)}
+  .pill.live{color:var(--ok); border-color:rgba(34,197,94,.35); background:var(--ok-bg)}
+  .pill.live .dot{background:var(--ok); box-shadow:0 0 0 4px rgba(34,197,94,.18); animation:pulse 1.8s infinite}
+  .pill.stale{color:var(--bad); border-color:rgba(239,68,68,.35); background:var(--bad-bg)}
+  .pill.stale .dot{background:var(--bad); box-shadow:0 0 0 4px rgba(239,68,68,.18)}
+  .pill.alarm{color:var(--bad); border-color:rgba(239,68,68,.4); background:var(--bad-bg)}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  /* layout */
+  .wrap{max-width:1280px; margin:0 auto}
+  .grid4{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px}
+  @media(max-width:1100px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:640px){.grid4{grid-template-columns:repeat(1,minmax(0,1fr))}}
+  .card{
+    background:linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
+    border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; position:relative; overflow:hidden;
+  }
+  .card::before{
+    content:""; position:absolute; inset:0 0 auto 0; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+  }
+  .label{font:600 10px/1 'Inter'; letter-spacing:.08em; text-transform:uppercase; color:var(--dim2)}
+  .card-sub{color:var(--dim); font-size:12px; margin-top:4px; line-height:1.4}
+  .card-head{margin-bottom:12px}
+  .wrap.stale .grid4 .card{opacity:.55}
+  /* health gauge */
+  .gauge-wrap{display:flex; gap:16px; align-items:center}
+  .gauge{width:92px;height:92px;position:relative;flex-shrink:0}
+  .gauge svg{transform:rotate(-90deg)}
+  .gauge-bg{fill:none; stroke:#1a2a3a; stroke-width:10}
+  .gauge-val{fill:none; stroke-width:10; stroke-linecap:round; transition:stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1), stroke .4s cubic-bezier(.2,.8,.2,1)}
+  .gauge-center{position:absolute; inset:0; display:grid; place-items:center; text-align:center}
+  .gauge-pct{font:700 22px/1 'JetBrains Mono', monospace; letter-spacing:-.04em}
+  .gauge-sub{font:600 10px/1 'Inter'; color:var(--dim); letter-spacing:.06em; margin-top:2px}
+  .health-meta{flex:1; min-width:0}
+  .big{font:700 28px/1 'Inter'; letter-spacing:-.03em}
+  .mono{font-family:'JetBrains Mono', monospace}
+  .sub{font-size:12px; color:var(--dim); margin-top:4px}
+  .bar{height:8px; background:#0f1a24; border-radius:999px; overflow:hidden; margin-top:10px; border:1px solid rgba(255,255,255,.04)}
+  .bar>div{height:100%; border-radius:999px; transition:width .6s cubic-bezier(.2,.8,.2,1), background .4s cubic-bezier(.2,.8,.2,1)}
+  /* rul */
+  .rul-big{font:700 34px/1 'JetBrains Mono', monospace; letter-spacing:-.04em}
+  .rul-unit{font:600 11px 'Inter'; color:var(--dim2); margin-left:4px}
+  .interval{margin-top:12px; background:#0f1a24; border-radius:999px; height:14px; position:relative; border:1px solid rgba(255,255,255,.04); padding:2px}
+  .interval-track{position:relative; height:100%; border-radius:999px; background:linear-gradient(90deg, var(--bad) 0%, var(--warn) 35%, var(--ok) 100%); opacity:.9}
+  .interval-marker{position:absolute; top:50%; width:10px;height:10px; background:white; border:2px solid #0a0e13; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 1px 6px rgba(0,0,0,.5)}
+  .interval-labels{display:flex; justify-content:space-between; font:500 10px 'JetBrains Mono', monospace; color:var(--dim2); margin-top:6px}
+  /* latency */
+  .lat-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:8px}
+  .lat-cell{background:rgba(0,0,0,.2); border:1px solid rgba(255,255,255,.04); border-radius:10px; padding:8px; text-align:center}
+  .lat-v{font:700 14px 'JetBrains Mono', monospace}
+  .lat-k{font:600 9px 'Inter'; letter-spacing:.06em; color:var(--dim2); text-transform:uppercase}
+  /* attention */
+  .attn-row{display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.04)}
+  .attn-row:last-child{border:0}
+  .attn-name{font:500 12px 'Inter'; min-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .attn-track{flex:1; height:8px; background:#0f1a24; border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,.04)}
+  .attn-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, #3b82f6, #60a5fa); transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .attn-pct{font:600 11px 'JetBrains Mono', monospace; min-width:36px; text-align:right; color:var(--dim)}
+  /* wide cards */
+  .wide{grid-column:1/-1}
+  .grid2{display:grid; grid-template-columns:minmax(0,1.65fr) minmax(0,.95fr); gap:14px; margin-top:14px}
+  @media(max-width:900px){.grid2{grid-template-columns:repeat(1,minmax(0,1fr))}}
+  .chart-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px}
+  .legend{display:flex; gap:12px; align-items:center; font:500 11px 'Inter'; color:var(--dim)}
+  .legend i{width:10px;height:3px; border-radius:999px; display:inline-block}
+  .chart-wrap{background:#0d131c; border:1px solid rgba(255,255,255,.04); border-radius:12px; padding:12px; overflow:hidden}
+  svg.chart{width:100%; height:140px; display:block}
+  .gridline{stroke:rgba(255,255,255,.06); stroke-width:1; stroke-dasharray:3 4}
+  .axis{font:500 10px 'JetBrains Mono', monospace; fill:var(--dim2)}
+  /* features */
+  .feat-table{width:100%; border-collapse:collapse}
+  .feat-table th{font:600 10px 'Inter'; letter-spacing:.06em; text-transform:uppercase; color:var(--dim2); text-align:left; padding:6px 8px; border-bottom:1px solid var(--line)}
+  .feat-table td{padding:8px; font:500 12px 'Inter'; border-bottom:1px solid rgba(255,255,255,.04)}
+  .feat-table td.mono{font-family:'JetBrains Mono', monospace; color:var(--dim); text-align:right}
+  /* footer */
+  .footer{margin-top:14px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; color:var(--dim); font:500 12px 'Inter'}
+  .footer code{font-family:'JetBrains Mono', monospace; font-size:11px; background:rgba(255,255,255,.05); padding:2px 6px; border-radius:6px; border:1px solid rgba(255,255,255,.06)}
+  .alarm-banner{
+    display:none; margin:14px auto 0; max-width:1280px;
+    background:linear-gradient(90deg, rgba(239,68,68,.15), rgba(239,68,68,.06));
+    border:1px solid rgba(239,68,68,.35); color:#fca5a5; border-radius:12px; padding:12px 16px;
+    font:600 13px 'Inter'; align-items:center; gap:10px;
+  }
+  .alarm-banner.show{display:flex}
+  .sim-notice{
+    display:none; margin:0 auto 14px; max-width:1280px;
+    background:var(--warn-bg); border:1px solid rgba(245,158,11,.35); color:var(--warn);
+    border-radius:12px; padding:10px 16px; font:500 12px 'Inter';
+  }
+  .sim-notice.show{display:block}
+  .spin{width:14px;height:14px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){
+    .pill.live .dot,.spin{animation:none}
+    *{transition:none !important}
+  }
+</style>
+
+<div class="top">
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/><path d="M12 3v2M6 7H4M20 12h2M6 17H4"/></svg>
+    </div>
+    <div>
+      <h1>UNIFY-RUL</h1>
+      <p>Universal Multi-Domain Prognostics · Pi 5 Edge</p>
+    </div>
+  </div>
+  <div class="pills">
+    <span class="pill" id="pill-live"><span class="dot"></span><span id="live-text">connecting…</span></span>
+    <span class="pill" id="pill-alarm" style="display:none"><span>⚠</span> MAINTENANCE ADVISED</span>
+    <span class="pill" id="pill-model" title="ONNX SHA"> <span id="model-text">—</span></span>
+  </div>
+</div>
+
+<div class="sim-notice" id="sim-notice">Demonstration mode: readings come from a simulated sensor (edge/fake_node.py), not a real machine. Its readings are invented, so the health and RUL numbers show the pipeline working, not real accuracy.</div>
+
+<div class="alarm-banner" id="alarm" title="Lower-bound health below threshold (EWMA α=0.3, 5 consecutive)">
+  <span style="font-size:16px">⚠</span>
+  <span>Maintenance advised — the pessimistic health estimate has stayed below the safe threshold for 5 readings in a row. Check the bearing.</span>
+</div>
+
+<div class="wrap">
+  <div class="grid4">
+    <!-- Health -->
+    <div class="card">
+      <div class="card-head">
+        <div class="label">Health Index</div>
+        <div class="card-sub">How healthy the machine looks right now (100% = like new).</div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg width="92" height="92" viewBox="0 0 92 92"><circle class="gauge-bg" cx="46" cy="46" r="36"/><circle id="gauge-val" class="gauge-val" cx="46" cy="46" r="36" stroke-dasharray="226.19" stroke-dashoffset="226.19" style="stroke:var(--ok)"/></svg>
+          <div class="gauge-center"><div><div class="gauge-pct" id="health-pct">—</div><div class="gauge-sub" id="health-sub">—</div></div></div>
+        </div>
+        <div class="health-meta">
+          <div class="big mono" id="health-big">—%</div>
+          <div class="sub" id="health-note">EWMA smoothed</div>
+          <div class="bar"><div id="healthbar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RUL -->
+    <div class="card">
+      <div class="card-head"><div class="label">Remaining Useful Life</div><div class="card-sub">Estimated time left before maintenance is needed; the bar is the 80% range.</div></div>
+      <div><span class="rul-big" id="rul">—</span><span class="rul-unit" id="rul-unit">cycles</span></div>
+      <div class="sub" id="rul-conv"></div>
+      <div class="sub" id="rulnote">quantile interval [q10, q90]</div>
+      <div class="bar" id="rul-warmup" style="display:none"><div id="rul-warmup-fill" style="width:0%"></div></div>
+      <div class="interval"><div class="interval-track" id="interval-track"></div><div class="interval-marker" id="interval-marker" style="left:50%"></div></div>
+      <div class="interval-labels"><span id="rul-lo">—</span><span>median</span><span id="rul-hi">—</span></div>
+    </div>
+
+    <!-- Latency -->
+    <div class="card">
+      <div class="card-head"><div class="label" id="lat-label">Inference · ARM Cortex-A76</div><div class="card-sub" id="lat-explain">How long the Raspberry Pi takes to run the AI model once.</div></div>
+      <div class="big mono" id="p50">—</div>
+      <div class="sub" id="lat-sub">p50 latency · CPU only, ONNX Runtime</div>
+      <div class="lat-grid">
+        <div class="lat-cell"><div class="lat-v mono" id="lat-p95">—</div><div class="lat-k">p95</div></div>
+        <div class="lat-cell"><div class="lat-v mono" id="lat-p99">—</div><div class="lat-k">p99</div></div>
+        <div class="lat-cell"><div class="lat-v mono" id="lat-n">—</div><div class="lat-k">samples (n)</div></div>
+      </div>
+      <div class="sub" id="lat-ratio" style="margin-top:8px">collecting latency stats…</div>
+    </div>
+
+    <!-- Attention -->
+    <div class="card">
+      <div class="card-head"><div class="label">Attention · Channel Usage</div><div class="card-sub">Which sensor channels the model is paying most attention to.</div></div>
+      <div id="attn" style="margin-top:2px"></div>
+      <div class="sub" style="margin-top:10px">Averaged across the model's attention heads. Shows where it looks, not what causes wear.</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="chart-head">
+        <div class="label">Health Trajectory · last 240 windows</div>
+        <div class="legend"><i style="background:var(--ok)"></i> health <i style="background:var(--warn)"></i> EWMA <span id="chart-range" style="color:var(--dim2)">0–100%</span></div>
+      </div>
+      <div class="chart-wrap"><svg class="chart" viewBox="0 0 640 140" preserveAspectRatio="none" id="chart"></svg></div>
+      <div class="sub" style="margin-top:8px">Health over the last 240 readings. A downward slope means the machine is wearing out.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="label">Live Features · 6 bearing channels</div></div>
+      <table class="feat-table"><thead><tr><th>Channel</th><th style="text-align:right">Value</th></tr></thead><tbody id="feat"></tbody></table>
+      <div class="sub" id="feat-note" style="margin-top:8px">Mapped via config/live_map.json → femto</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <span id="status">connecting…</span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center">
+      <code id="window-code">window —</code>
+      <code id="uptime-code">uptime —</code>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (v,n=2)=> v===null||v===undefined ? '—' : Number(v).toFixed(n);
+const clamp = (v,a,b)=> Math.max(a, Math.min(b,v));
+let lastRows = [];
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function colorForHealth(p){
+  if(p<30) return cssVar('--bad');
+  if(p<60) return cssVar('--warn');
+  return cssVar('--ok');
+}
+function parseRef(note){
+  const m = /ref=([^\s]+)/.exec(note||'');
+  return m ? m[1].toLowerCase() : '';
+}
+function unitForRef(ref){
+  if(ref==='cmapss') return 'cycles';
+  if(ref==='femto') return 'seconds';
+  if(ref==='xjtu') return 'minutes';
+  return 'time units';
+}
+function approxDuration(rul, unit){
+  if(rul==null) return '';
+  if(unit==='seconds'){
+    const t=Math.max(0,Math.round(rul));
+    const hh=Math.floor(t/3600), mm=Math.round((t%3600)/60);
+    if(hh>0) return `\u2248 ${hh} h ${mm} min`;
+    if(mm>0) return `\u2248 ${mm} min`;
+    return `\u2248 ${t} s`;
+  }
+  if(unit==='minutes'){
+    const t=Math.max(0,Math.round(rul));
+    const hh=Math.floor(t/60), mm=t%60;
+    if(hh>0) return `\u2248 ${hh} h ${mm} min`;
+    return `\u2248 ${t} min`;
+  }
+  return '';
+}
+function techNote(note){
+  return String(note||'').split(' ').filter(p=>!(p.indexOf('cond=')===0 && p.split('=')[1]==='None')).join(' ');
+}
+const FEAT_FRIENDLY = {
+  h_rms:'Horizontal vibration (RMS)', v_rms:'Vertical vibration (RMS)',
+  h_kurt:'Horizontal spikiness (kurtosis)', v_kurt:'Vertical spikiness (kurtosis)',
+  h_crest:'Horizontal peak ratio (crest)', v_crest:'Vertical peak ratio (crest)'
+};
+function friendlyFeat(n){ const b=String(n).split('/').pop(); return FEAT_FRIENDLY[b]||b; }
+const ATTN_SHORT = {
+  h_rms:'H vibration', v_rms:'V vibration',
+  h_kurt:'H spikiness', v_kurt:'V spikiness',
+  h_crest:'H peak ratio', v_crest:'V peak ratio'
+};
+function shortAttn(n){ const b=String(n).split('/').pop(); return ATTN_SHORT[b]||b; }
+
+function drawChart(rows){
+  const svg = $('chart');
+  svg.innerHTML = '';
+  const W=640,H=140, padL=28, padB=18, padT=10, padR=8;
+  const w=W-padL-padR, h=H-padT-padB;
+  // grid
+  for(let i=0;i<=4;i++){
+    const y=padT + (h/4)*i;
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',padL); line.setAttribute('x2',W-padR);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('class','gridline');
+    svg.appendChild(line);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',4); t.setAttribute('y',y+3); t.setAttribute('class','axis');
+    t.textContent=(1 - i/4).toFixed(2);
+    svg.appendChild(t);
+  }
+  if(!rows.length) return;
+  const vals=rows.map(r=>clamp(r.health,0,1));
+  const step = w / Math.max(1, vals.length-1);
+  const pts = vals.map((v,i)=> [padL + i*step, padT + (1 - v)*h]);
+  // area
+  const areaD = `M ${pts[0][0]},${padT+h} ` + pts.map(p=>`L ${p[0]},${p[1]}`).join(' ') + ` L ${pts[pts.length-1][0]},${padT+h} Z`;
+  const area=document.createElementNS('http://www.w3.org/2000/svg','path');
+  area.setAttribute('d', areaD);
+  area.setAttribute('fill','url(#grad)');
+  area.setAttribute('opacity','0.25');
+  svg.appendChild(area);
+  // line
+  const lineD = pts.map((p,i)=> (i?'L':'M')+` ${p[0]},${p[1]}`).join(' ');
+  const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+  line.setAttribute('d', lineD);
+  line.setAttribute('fill','none'); line.setAttribute('stroke',cssVar('--ok')||'#22c55e'); line.setAttribute('stroke-width','1.8'); line.setAttribute('stroke-linejoin','round'); line.setAttribute('stroke-linecap','round');
+  svg.appendChild(line);
+  // defs
+  const okc=cssVar('--ok')||'#22c55e';
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  defs.innerHTML=`<linearGradient id="grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${okc}" stop-opacity="0.6"/><stop offset="100%" stop-color="${okc}" stop-opacity="0"/></linearGradient>`;
+  svg.insertBefore(defs, svg.firstChild);
+  // x labels
+  const total=rows.length;
+  [0, Math.round(total/3), Math.round(2*total/3), total].forEach((txt,i)=>{
+    const t2=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t2.setAttribute('x', padL + (w/3)*i); t2.setAttribute('y', H-2); t2.setAttribute('class','axis');
+    if(i===3) t2.setAttribute('text-anchor','end');
+    t2.textContent=txt; svg.appendChild(t2);
+  });
+}
+
+async function tick(){
+  let h,m,r;
+  try{
+    [h,m,r]=await Promise.all([fetch('/health').then(x=>x.json()), fetch('/metrics').then(x=>x.json()), fetch('/api/recent?n=240').then(x=>x.json())]);
+  }catch(e){
+    $('live-text').textContent='SERVER UNREACHABLE'; $('pill-live').className='pill stale';
+    return;
+  }
+  const isLive=!h.stale;
+  if (isLive && h.node === 'fake') {
+    $('live-text').textContent = 'LIVE · SIMULATED SENSOR';
+  } else {
+    $('live-text').textContent = isLive ? 'LIVE' : 'SENSOR OFFLINE';
+  }
+  $('sim-notice').className = (h.node === 'fake') ? 'sim-notice show' : 'sim-notice';
+  $('pill-live').className = 'pill ' + (isLive ? 'live' : 'stale');
+  $('pill-alarm').style.display = h.alarm ? 'inline-flex' : 'none';
+  $('alarm').className = h.alarm ? 'alarm-banner show' : 'alarm-banner';
+  const rawModel = h.model + ' \u00b7 ' + h.model_note;
+  const ref = parseRef(h.model_note);
+  $('model-text').textContent = ref ? `Model \u00b7 ${ref.toUpperCase()} bearing profile` : 'Model';
+  $('pill-model').title = rawModel;
+  $('rul-unit').textContent = unitForRef(ref);
+  document.querySelector('.wrap').classList.toggle('stale', !!h.stale);
+  // latency
+  const p50=m.p50_ms, p95=m.p95_ms, p99=m.p99_ms;
+  $('p50').textContent = p50==null ? '—' : p50.toFixed(2)+' ms';
+  $('lat-p95').textContent = p95==null?'—':p95.toFixed(2);
+  $('lat-p99').textContent = p99==null?'—':p99.toFixed(2);
+  $('lat-n').textContent = m.n ?? '—';
+  $('lat-sub').textContent = p95==null ? 'warming up' : `p95 ${fmt(p95)} \u00b7 p99 ${fmt(p99)} \u00b7 n=${m.n}`;
+  $('lat-ratio').textContent = (p50!=null && p99!=null && p50>0) ? `p99 is ${((p99-p50)/p50*100).toFixed(0)}% above the median` : 'collecting latency stats…';
+  if (h.cpu) {
+    $('lat-label').textContent = 'Inference · ' + h.cpu;
+    $('lat-explain').textContent = (h.device && h.device.indexOf('Raspberry Pi') === 0) ? 'How long the Raspberry Pi takes to run the AI model once.' : 'How long this computer takes to run the AI model once (not the Pi — Pi numbers will differ).';
+  }
+
+  const rows=r.rows;
+  lastRows=rows;
+  if(rows.length){
+    const last=rows[rows.length-1];
+    const pct=clamp(last.health,0,1)*100;
+    const col=colorForHealth(pct);
+    $('health-pct').textContent = pct.toFixed(0)+'%';
+    $('health-pct').style.color = col;
+    $('health-sub').textContent = last.alarm ? 'ALARM' : pct<30?'CRITICAL':pct<60?'DEGRADING':'HEALTHY';
+    $('health-sub').style.color = col;
+    $('health-big').textContent = pct.toFixed(0)+'%';
+    $('health-big').style.color = col;
+    $('health-note').textContent = isLive ? 'Smoothed over recent readings (cautious estimate)' : `stale \u00b7 last reading ${fmt(h.last_packet_age_s)} s ago`;
+    const circ=2*Math.PI*36;
+    const off=circ * (1 - pct/100);
+    const gv=$('gauge-val');
+    gv.style.strokeDashoffset=off; gv.style.stroke=col;
+    $('healthbar').style.width=pct+'%'; $('healthbar').style.background=col;
+
+    const unit = unitForRef(parseRef(h.model_note));
+    $('rul-unit').textContent = unit;
+    $('rul').textContent = fmt(last.rul,1);
+    $('rul-conv').textContent = approxDuration(last.rul, unit);
+    $('rul-lo').textContent = fmt(last.rul_lo,0);
+    $('rul-hi').textContent = fmt(last.rul_hi,0);
+    $('rulnote').textContent = last.rul_lo!==null ? `Likely range: ${fmt(last.rul_lo,0)} \u2013 ${fmt(last.rul_hi,0)} ${unit} (80% interval)` : 'point estimate';
+    $('rulnote').title = last.rul_lo!==null ? `q10\u2013q50\u2013q90 \u00b7 scale ${h.model_note.split('scale=')[1]||'\u2014'}` : '';
+    $('rul-warmup').style.display='none';
+    // interval marker position: median relative to lo-hi
+    const lo=last.rul_lo ?? last.rul, hi=last.rul_hi ?? last.rul, med=last.rul;
+    const span=Math.max(1, hi-lo);
+    const pos=clamp((med-lo)/span,0,1);
+    $('interval-marker').style.left = (pos*100)+'%';
+
+    // attention
+    const feats=r.features;
+    const a=feats.map((_,i)=>(last.attn||[])[i]??0);
+    const mx=Math.max(...a,1e-9);
+    $('attn').innerHTML = feats.map((n,i)=>`
+      <div class="attn-row" title="${n}">
+        <div class="attn-name">${shortAttn(n)}</div>
+        <div class="attn-track"><div class="attn-fill" style="width:${(a[i]/mx*100).toFixed(0)}%"></div></div>
+        <div class="attn-pct">${(a[i]*100).toFixed(0)}%</div>
+      </div>`).join('');
+
+    // features
+    $('feat').innerHTML = feats.map((n,i)=>`<tr><td><div>${friendlyFeat(n)}</div><div class="mono" style="font-size:10px;color:var(--dim)">${n}</div></td><td class="mono">${fmt(last.feat[i],4)}</td></tr>`).join('');
+    drawChart(rows);
+  } else {
+    const parts=String(h.window||'0/30').split('/');
+    const have=parseInt(parts[0],10)||0, need=parseInt(parts[1],10)||30;
+    const wpct=need?clamp(have/need*100,0,100):0;
+    const wmsg=`Collecting the first ${need} readings (about ${need} s)\u2026 ${h.window}`;
+    $('health-note').textContent=wmsg;
+    $('healthbar').style.width=wpct+'%';
+    $('rulnote').textContent=wmsg;
+    $('rul-conv').textContent='';
+    $('rul-warmup').style.display='block';
+    $('rul-warmup-fill').style.width=wpct+'%';
+    drawChart([]);
+    $('feat').innerHTML=`<tr><td colspan=2 style="color:var(--dim)">waiting for ${h.window} windows…</td></tr>`;
+  }
+  $('window-code').textContent = `window ${h.window} · gaps ${h.gaps} · rejected ${h.rejected}`;
+  $('uptime-code').textContent = `uptime ${h.uptime_s}s · last ${fmt(h.last_packet_age_s)}s ago`;
+  $('status').textContent = `Technical: ${h.model} · ${techNote(h.model_note)} · ${h.features.length} channels`;
+}
+tick(); setInterval(tick,1000);
+</script>

@@ -1,0 +1,68 @@
+[Unit]
+# A demo that needs someone to SSH in and start it by hand is a demo that fails
+# in front of an audience. This runs dashboard/app.py, which starts the
+# inspection pipeline in a background thread and serves the web UI from the
+# same process -- one unit, not two, so they cannot get out of step.
+Description=Real-time surface defect inspection (pipeline and dashboard)
+Documentation=https://github.com/Vishnu-3727/defect-inspect
+After=network-online.target
+Wants=network-online.target
+
+# Three demos share one Pi with four cores and are never shown at the same
+# time. Conflicts= makes that mutual exclusion the init system's job: starting
+# any one of them stops the other two, so there is no way to leave two running
+# and wonder why the frame rate collapsed. Measured on this host: defectvision
+# alone is 33.9 ms/frame, defectvision with this unit also running is 188 ms.
+# EVERY unit must name the other two -- systemd does not infer the reverse
+# direction, and it was that missing edge (defectvision named nobody) that let
+# the pair run together at all.
+Conflicts=unify-rul.service
+
+# Five restarts in five minutes, then stop trying. Without this a unit that
+# fails at boot -- no camera, missing model -- respawns forever and buries the
+# real error in a scrolling journal.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/defect-inspect
+# --source replays the 60 committed fixture images on a loop, because no camera
+# is attached yet. Delete the --source argument once one is: capture.source is
+# "auto" in configs/default.yaml, which picks picamera2 when it is importable.
+# bench_fixtures rather than data/ because data/ is gitignored and a fresh
+# clone would not have it.
+ExecStart=%h/.local/bin/uv run python dashboard/app.py --source %h/defect-inspect/bench_fixtures/images --loop
+Restart=on-failure
+RestartSec=5
+
+# --- Shutdown guarantee -----------------------------------------------------
+# The demo must leave nothing behind: no inference threads holding the four
+# cores, no port still bound, no JPEG writer filling the SD card. KillMode is
+# control-group (the default, stated explicitly because this is the whole
+# point): systemd signals every process in the unit's cgroup, not just the one
+# it spawned, so a `uv run` wrapper cannot orphan its child. TimeoutStopSec
+# bounds how long a wedged ONNX session may stall the stop, and FinalKillSignal
+# then removes it unconditionally. Without these three, "closed" means "the
+# main process exited".
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
+FinalKillSignal=SIGKILL
+
+# A requested stop arrives as SIGTERM. `uv run` does not die from it itself --
+# it waits for the child and exits 128+15 -- and systemd would call that a
+# failure. It is not: switching demos is not a crash.
+SuccessExitStatus=143
+
+# Unbuffered, or Python holds log lines in a 4 KB buffer and journalctl shows
+# nothing until the process dies -- exactly when you need the output.
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+# NOT enabled at boot, deliberately. This unit was previously the only one that
+# was, and an unattended Pi ran it for weeks: 472,973 evidence JPEGs, 9.3 GB,
+# four cores pinned. A demo starts when someone asks for it.
+[Install]
+WantedBy=default.target

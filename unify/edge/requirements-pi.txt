@@ -1,0 +1,10 @@
+# Light deps — everything here must install from a wheel on 64-bit Raspberry Pi OS.
+# NOTHING that pulls in torch. See docs/07-software-stack.md
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+
+# The stub is gone -- edge/inference.py loads the real ONNX model, so these are
+# required, not optional. Both have aarch64 wheels on 64-bit Raspberry Pi OS.
+numpy==2.2.1
+onnxruntime==1.20.1

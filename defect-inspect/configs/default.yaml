@@ -1,0 +1,78 @@
+# Single source of truth for the runtime. Nothing below is hardcoded in the code.
+# Every field is validated on load by src/inspector/config.py.
+
+classes:
+  - crazing
+  - inclusion
+  - patches
+  - pitted_surface
+  - rolled-in_scale
+  - scratches
+
+capture:
+  # auto | picamera | device | video | folder
+  source: auto
+  device_index: 0
+  path: ""          # used when source is video or folder
+  width: 640
+  height: 480
+  # Sensor frame rate. Only meaningful for a real camera.
+  fps: 30
+  # Replay rate for the `folder` and `video` sources, which is a DIFFERENT
+  # quantity: it paces a synthetic conveyor for a person to watch, not a sensor.
+  # At 30 each fixture image is on screen for 33 ms and the view is unreadable.
+  # 2 gives half a second per part, which is roughly how long a human needs to
+  # see what the box is drawn around.
+  replay_fps: 2
+
+detector:
+  model: models/model_int8.onnx
+  imgsz: 320
+  conf_threshold: 0.35   # below this a box is discarded
+  iou_threshold: 0.45    # NMS overlap limit
+  num_threads: 4         # Pi 5 has 4 Cortex-A76 cores
+
+anomaly:
+  enabled: true
+  bank: models/patchcore_bank.npz
+  imgsz: 256
+  # PatchCore only runs when the detector is unsure. See docs/14.
+  gate_conf_below: 0.55
+  # Hard cap so the slow path can never sink the frame rate.
+  max_calls_per_second: 3
+  # Calibrated, not guessed: the 95th percentile of scores from defect-free
+  # image regions, measured by `python -m inspector.anomaly`. Re-run that after
+  # rebuilding the bank, or after changing the lighting rig, and update this.
+  #
+  # Be aware the separation is weak on this dataset -- median defect 2.40 vs
+  # median normal 2.26. See reports/anomaly.md. The module is a backstop for
+  # defect types YOLOv8 never saw, not a second accurate classifier.
+  score_threshold: 2.77
+
+decision:
+  # A frame FAILs if the detector finds a box above conf_threshold,
+  # or the gated anomaly score exceeds score_threshold.
+  min_defect_area_px: 40
+
+storage:
+  db: inspection.db
+  save_fail_images: true
+  image_dir: reports/failures
+
+actuator:
+  # mock | serial | gpio
+  backend: mock
+  pulse_ms: 250
+  # serial backend
+  port: COM3
+  baud: 9600
+  # gpio backend (Pi 5, BCM numbering)
+  pin: 17
+  # Delay between the decision and the solenoid firing, in seconds.
+  # Equals (camera-to-ejector distance) / (belt speed). Calibrate on the rig.
+  eject_delay_s: 0.0
+
+dashboard:
+  host: 0.0.0.0
+  port: 5000
+  jpeg_quality: 70

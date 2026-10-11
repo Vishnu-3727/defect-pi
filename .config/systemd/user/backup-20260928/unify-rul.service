@@ -1,0 +1,43 @@
+[Unit]
+# systemd --user unit, not a system unit: it never runs as root, %h resolves to
+# the real home, and no sudo is needed to switch demos. Needs `loginctl
+# enable-linger` once, which is already set on this Pi for defect-inspect.
+Description=UNIFY-RUL edge inference service and dashboard
+After=network-online.target
+Wants=network-online.target
+
+# The other demo on this Pi. Starting this unit stops that one, and vice versa.
+# Both sides must declare it -- systemd does not infer the reverse direction.
+Conflicts=defect-inspect.service
+
+# Five restarts in five minutes, then give up. Otherwise a missing artifact at
+# boot respawns forever and buries the real error in a scrolling journal.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# app.py resolves artifacts/ and the repo root relative to its own location,
+# so the working directory has to be edge/, not the repo root.
+WorkingDirectory=%h/unify/edge
+ExecStart=%h/unify/.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Unbuffered, or Python holds log lines in a 4 KB buffer and journalctl shows
+# nothing until the process dies -- exactly when you need the output.
+Environment=PYTHONUNBUFFERED=1
+
+# Live channel map.  The tri-domain checkpoint now contains FEMTO/XJTU/C-MAPSS
+# statistics, so the default config/live_map.json (ref_dataset=femto, 6 bearing
+# channels) works.  For a synthetic-only build override with
+# live_map.synthetic.json — see README "Why the Pi runs a different model".
+# This line is intentionally NOT set by default so UNIFY_LIVE_MAP defaults to
+# config/live_map.json via edge/inference.py:live_map_path().  Uncomment to
+# force synthetic on the Pi:
+# Environment=UNIFY_LIVE_MAP=%h/unify/config/live_map.synthetic.json
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,54 @@
+# UNIFY-RUL training configuration.
+# Every value here is logged into the checkpoint and into results/metrics.json,
+# so a run is always reproducible from its config + seed.
+
+seed: 42
+
+data:
+  interim_dir: data/interim
+  datasets: [cmapss, femto, xjtu]   # use [synthetic] to run without downloads
+  window: 30                        # L — timesteps per window. See docs/05 §5.4
+  stride_train: 1
+  stride_eval: 1
+  val_frac: 0.2                     # fraction of UNITS (never of windows)
+  balance_datasets: true            # inverse-frequency sampling so C-MAPSS doesn't dominate
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_queries: 1
+  dropout: 0.2
+  attn_dropout: 0.1
+  sensor_vocab: 64                  # >= max ID in config/sensor_vocab.json + 1
+  n_domains: 8
+  # group | batch. GroupNorm is batch-independent — required here because sensors
+  # are folded into the batch dimension, so BatchNorm would let zero-padding from
+  # mixed-sensor-count batches move the statistics. See unify/models/encoder.py
+  norm: group
+  # Sigmoid bounds the output to [0,1] but saturates where the RUL cap puts most
+  # labels at exactly 1.0. Default off + clamp at eval. Flip it and compare —
+  # docs/06-model.md §6.7 says to decide this empirically, so decide it.
+  sigmoid_output: false
+
+loss:
+  kind: smooth_l1                   # smooth_l1 | mse | asym_mse | pinball
+  beta: 0.1                         # SmoothL1 transition point (normalised units)
+  late_weight: 2.0                  # asym_mse only: penalty multiplier for late predictions
+  quantiles: [0.1, 0.5, 0.9]        # pinball only — gives prediction intervals (solves P4)
+  nasa_weight: 0.0                  # >0 adds a clamped NASA term; keep 0 until the baseline trains
+
+optim:
+  epochs: 100
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  warmup_epochs: 5
+  min_lr: 1.0e-5
+  grad_clip: 1.0
+  early_stop_patience: 15
+  num_workers: 0                    # >0 on Linux; 0 on Windows avoids spawn overhead
+
+out:
+  ckpt: results/best.pt
+  metrics: results/metrics.json
+  artifacts: edge/artifacts

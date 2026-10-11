@@ -1,0 +1,72 @@
+# Measure inference speed on a real ARM CPU.
+#
+# The development laptop is x86-64 with AVX-512 and VNNI. The Raspberry Pi 5 is
+# four Cortex-A76 cores with 128-bit NEON. Those are not comparable, and no
+# amount of thread pinning makes them comparable, so laptop FPS cannot be quoted
+# for the Pi.
+#
+# GitHub's ubuntu-24.04-arm runners are Neoverse-class: the same ARMv8.2
+# generation as the A76, with the same two 128-bit NEON FMA pipes and the same
+# SDOT instruction for INT8. Clock and cache differ, so this is still not a Pi
+# measurement -- but it is a real ARM measurement, and both the ratios and the
+# rough magnitude transfer in a way x86 numbers never could.
+#
+# Replace this with a measurement on the actual Pi 5 as soon as one exists.
+
+name: ARM benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bench:
+    name: ONNX Runtime on ARM64
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report the CPU we actually got
+        run: |
+          echo "--- architecture ---"
+          uname -m
+          echo "--- cores ---"
+          nproc
+          echo "--- CPU detail ---"
+          lscpu | grep -Ei 'model name|architecture|core|thread|mhz|bogomips|flags' || true
+          echo "--- NEON / dotprod support ---"
+          grep -m1 Features /proc/cpuinfo || true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Runtime dependencies only. No torch, no ultralytics -- exactly the
+      # install that goes on the Pi. If this step fails, a dependency lacks an
+      # arm64 wheel, which is itself the deployment answer we want.
+      - name: Install runtime dependencies
+        run: uv sync
+
+      - name: Verify no training dependency leaked into the runtime
+        run: |
+          uv run python - <<'PY'
+          import importlib.util as u
+          leaked = [m for m in ("torch", "ultralytics", "torchvision") if u.find_spec(m)]
+          assert not leaked, f"runtime install pulled in {leaked}; the Pi must not need these"
+          print("runtime is clean: no torch, no ultralytics")
+          PY
+
+      - name: Self-checks
+        run: |
+          uv run python -m inspector.config
+          uv run python -m inspector.preprocess
+
+      - name: Benchmark, 4 threads to match the Pi 5 core count
+        run: uv run python -m inspector.bench --threads 4 --frames 60 --repeats 3
+
+      - name: Benchmark across thread counts, FP32 against INT8
+        run: uv run python -m inspector.bench --compare --frames 60 --repeats 3

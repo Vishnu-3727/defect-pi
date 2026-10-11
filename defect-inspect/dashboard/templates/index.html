@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defect Inspection</title>
+<style>
+  :root {
+    --bg:#12151a; --panel:#1b2029; --sunk:#151a22; --line:#2b3240;
+    --text:#e6e9ef; --muted:#8b95a7; --dim:#5c6678;
+    --pass:#3ddc97; --fail:#ff5c5c; --accent:#4da3ff; --warn:#f0b429;
+    /* Chart marks are their own OKLCH steps, validated against --panel for the
+       dark lightness band, chroma floor, CVD separation and contrast. Not the
+       text colours, which sit above the band deliberately. */
+    --mark-thr:#2b8cf0; --mark-rej:#f0444b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+
+  header{padding:12px 20px;border-bottom:1px solid var(--line);
+         display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  h1{font-size:16px;margin:0;font-weight:600;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12.5px;display:flex;gap:14px;flex-wrap:wrap}
+  .sub b{color:var(--text);font-weight:600}
+
+  main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+       gap:14px;padding:14px;align-items:start}
+  @media (max-width:980px){main{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         padding:13px 14px;min-width:0}
+  .panel > h2{font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+              color:var(--muted);margin:0 0 11px;font-weight:600;
+              display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .panel > h2 .note{text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400}
+  .span2{grid-column:1/-1}
+
+  /* live view */
+  .stage{position:relative;background:#000;border-radius:8px;overflow:hidden;
+         aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
+  .stage img{width:100%;height:100%;object-fit:contain;display:block}
+  .stage .veil{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+               background:rgba(18,21,26,.82);color:var(--muted);font-size:13px;text-align:center;padding:16px}
+  .stage.is-stalled .veil,.stage.is-error .veil{display:flex}
+
+  /* tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:9px}
+  .tile{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .tile .v{font-size:21px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.2}
+  .tile .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  .pass{color:var(--pass)}.fail{color:var(--fail)}.accent{color:var(--accent)}
+
+  /* chips */
+  .chips{display:flex;gap:7px;flex-wrap:wrap;font-size:12px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+        border:1px solid var(--line);background:var(--sunk);color:var(--muted);white-space:nowrap}
+  .chip b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+  .chip.good{border-color:rgba(61,220,151,.45)}
+  .chip.warn{border-color:rgba(240,180,41,.55);color:var(--warn)}
+  .chip.bad{border-color:rgba(255,92,92,.55);color:var(--fail)}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+
+  /* filters */
+  .filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .filters button{background:var(--sunk);color:var(--muted);font:inherit;font-size:12px;
+                  border:1px solid var(--line);border-radius:6px;padding:5px 11px;cursor:pointer}
+  .filters button:hover{color:var(--text);border-color:#3a4354}
+  .filters button[aria-pressed="true"]{background:rgba(77,163,255,.14);color:var(--accent);border-color:#2f5f92}
+  .linkish{background:none;border:0;color:var(--accent);font:inherit;font-size:12px;
+           cursor:pointer;padding:2px 0;text-decoration:underline}
+  :is(button,[tabindex],summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* charts */
+  figure{margin:0 0 10px}
+  figcaption{font-size:12px;color:var(--muted);margin-bottom:3px;
+             display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  figcaption b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+  .chart{position:relative}
+  .chart svg{display:block;width:100%;height:84px;overflow:visible}
+  .tip{position:absolute;pointer-events:none;opacity:0;transform:translate(-50%,-100%);
+       transition:opacity .08s;background:#0d1016;border:1px solid var(--line);border-radius:6px;
+       padding:4px 8px;font-size:12px;white-space:nowrap;z-index:5;font-variant-numeric:tabular-nums}
+  .tip.on{opacity:1}
+  .axis{font-size:10px;fill:var(--dim)}
+
+  /* bars */
+  .bars{display:grid;gap:7px}
+  .barrow{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:12px;align-items:baseline}
+  .barrow .n{color:var(--muted);font-variant-numeric:tabular-nums}
+  .track{grid-column:1/-1;height:5px;background:#232a35;border-radius:3px;overflow:hidden}
+  .track > i{display:block;height:100%;background:var(--accent);transition:width .3s}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  caption{text-align:left;color:var(--dim);font-size:11.5px;padding-bottom:6px}
+  th{text-align:left;color:var(--muted);font-weight:500;padding:6px 8px;
+     border-bottom:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+     position:sticky;top:0;background:var(--panel);z-index:1}
+  td{padding:5px 8px;border-bottom:1px solid #232a35;font-variant-numeric:tabular-nums}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr[data-id]{cursor:pointer}
+  tbody tr[data-id]:hover{background:#20262f}
+  .badge{padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600}
+  .badge.PASS{background:rgba(61,220,151,.15);color:var(--pass)}
+  .badge.FAIL{background:rgba(255,92,92,.15);color:var(--fail)}
+  .scroll{max-height:320px;overflow-y:auto}
+  .reason{max-width:26ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);
+         border-radius:10px;padding:14px;max-width:92vw}
+  dialog::backdrop{background:rgba(0,0,0,.66)}
+  dialog img{max-width:76vw;max-height:66vh;display:block;border-radius:6px;background:#000}
+  .sronly{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .empty{color:var(--dim);font-size:12.5px;padding:6px 0}
+  .explain{margin:10px 0 8px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+  .explain b{font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:11.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .legend i{width:9px;height:9px;border-radius:2px;flex:none;background:var(--dim)}
+  .srcbanner{display:block;align-items:center;gap:8px;margin:0 0 9px;padding:7px 10px;
+             border:1px solid var(--line);border-left:3px solid var(--warn);
+             border-radius:6px;background:var(--sunk);font-size:12px;color:var(--muted)}
+  .srcbanner b{color:var(--warn);font-weight:600}
+  .context{margin-top:11px;background:var(--sunk);border:1px solid var(--line);
+           border-radius:8px;padding:10px 11px}
+  .context > h3{font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+           color:var(--muted);margin:0 0 8px;font-weight:600}
+  .context-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start}
+  @media (max-width:980px){.context-grid{grid-template-columns:1fr}}
+  .context svg.diagram{display:block;width:100%;max-width:270px;height:auto}
+  .defect-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .defect{margin:0;min-width:0}
+  .defect figcaption{display:block;margin:0}
+  .defect img{width:68px;height:68px;image-rendering:auto;border:1px solid var(--line);
+           border-radius:6px;display:block;background:#000}
+  .defect .dname{font-size:11.5px;color:var(--text);margin-top:3px}
+  .defect .ddesc{font-size:11px;color:var(--muted);line-height:1.4}
+</style>
+</head>
+<body>
+<header>
+  <h1>Real-Time Industrial Defect Detection</h1>
+  <div class="sub" id="cfg"><span>connecting…</span></div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Live inspection <span class="note" id="srcnote"></span></h2>
+    <div class="srcbanner" id="srcbanner" hidden></div>
+    <div class="stage" id="stage">
+      <img id="live" alt="Live annotated camera stream">
+      <div class="veil" id="veil"></div>
+    </div>
+    <p class="explain" id="explain">
+      Each frame is a close-up of a small patch of hot-rolled steel strip surface (NEU-DET, 200×200 px, grayscale), not a whole part. A box marks a
+      surface defect the detector found, labelled with its type and confidence.
+      A patch with any box above the threshold is <b class="fail">FAILED</b> and
+      the ejector fires; otherwise it <b class="pass">PASSES</b>.
+    </p>
+    <div class="legend" id="legend"></div>
+    <div class="context">
+      <h3>What you are looking at</h3>
+      <div class="context-grid">
+        <svg class="diagram" viewBox="0 0 260 150" role="img" aria-label="Diagram: a steel strip travels over rollers past an overhead camera; one small highlighted patch of the strip is one frame">
+          <rect x="8" y="82" width="244" height="10" fill="var(--sunk)" stroke="var(--line)" stroke-width="2"/>
+          <circle cx="35" cy="106" r="14" fill="none" stroke="var(--muted)" stroke-width="2"/>
+          <circle cx="100" cy="106" r="14" fill="none" stroke="var(--muted)" stroke-width="2"/>
+          <circle cx="165" cy="106" r="14" fill="none" stroke="var(--muted)" stroke-width="2"/>
+          <circle cx="230" cy="106" r="14" fill="none" stroke="var(--muted)" stroke-width="2"/>
+          <line x1="28" y1="66" x2="208" y2="66" stroke="var(--accent)" stroke-width="2"/>
+          <polygon points="208,60 222,66 208,72" fill="var(--accent)"/>
+          <rect x="112" y="8" width="36" height="22" rx="3" fill="none" stroke="var(--muted)" stroke-width="2"/>
+          <circle cx="130" cy="19" r="5" fill="none" stroke="var(--muted)" stroke-width="2"/>
+          <line x1="116" y1="30" x2="100" y2="82" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
+          <line x1="144" y1="30" x2="160" y2="82" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
+          <rect x="123" y="80" width="14" height="14" fill="none" stroke="var(--warn)" stroke-width="2"/>
+          <line x1="130" y1="94" x2="130" y2="120" stroke="var(--warn)" stroke-width="1"/>
+          <text x="132" y="135" font-size="9" fill="var(--muted)" font-family="system-ui,sans-serif">one frame = this patch</text>
+        </svg>
+        <div class="defect-grid">
+          <figure class="defect">
+            <img src="/example/crazing_101.jpg" alt="Example patch with crazing: fine network of surface cracks" loading="lazy">
+            <figcaption><div class="dname">crazing</div><div class="ddesc">fine network of surface cracks</div></figcaption>
+          </figure>
+          <figure class="defect">
+            <img src="/example/inclusion_121.jpg" alt="Example patch with inclusion: foreign material pressed into the surface" loading="lazy">
+            <figcaption><div class="dname">inclusion</div><div class="ddesc">foreign material pressed into the surface</div></figcaption>
+          </figure>
+          <figure class="defect">
+            <img src="/example/patches_135.jpg" alt="Example patch with patches: dark irregular blotches" loading="lazy">
+            <figcaption><div class="dname">patches</div><div class="ddesc">dark irregular blotches</div></figcaption>
+          </figure>
+          <figure class="defect">
+            <img src="/example/pitted_surface_123.jpg" alt="Example patch with pitted surface: small pits and craters" loading="lazy">
+            <figcaption><div class="dname">pitted_surface</div><div class="ddesc">small pits and craters</div></figcaption>
+          </figure>
+          <figure class="defect">
+            <img src="/example/rolled-in_scale_102.jpg" alt="Example patch with rolled-in scale: oxide scale rolled into the surface" loading="lazy">
+            <figcaption><div class="dname">rolled-in_scale</div><div class="ddesc">oxide scale rolled into the surface</div></figcaption>
+          </figure>
+          <figure class="defect">
+            <img src="/example/scratches_122.jpg" alt="Example patch with scratches: straight lines dragged along the strip" loading="lazy">
+            <figcaption><div class="dname">scratches</div><div class="ddesc">straight lines dragged along the strip</div></figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+    <div class="chips" id="health" style="margin-top:11px"><span class="chip">checking…</span></div>
+  </section>
+
+  <section class="panel">
+    <h2>This run</h2>
+    <div class="tiles">
+      <div class="tile"><div class="v accent" id="fps">–</div><div class="k">FPS</div></div>
+      <div class="tile"><div class="v" id="lat">–</div><div class="k">ms / frame</div></div>
+      <div class="tile"><div class="v" id="p95">–</div><div class="k">p95 ms</div></div>
+      <div class="tile"><div class="v pass" id="pass">–</div><div class="k">Pass</div></div>
+      <div class="tile"><div class="v fail" id="fail">–</div><div class="k">Fail</div></div>
+      <div class="tile"><div class="v" id="anom">–</div><div class="k">Anomaly</div></div>
+    </div>
+    <h2 style="margin:16px 0 9px">Defect classes <span class="note" id="winlabel"></span></h2>
+    <div class="bars" id="classes"><div class="empty">waiting for data…</div></div>
+    <h2 style="margin:16px 0 9px">All time <span class="note">since the database was last cleared</span></h2>
+    <div class="tiles">
+      <div class="tile"><div class="v" id="total">–</div><div class="k">Inspected</div></div>
+      <div class="tile"><div class="v" id="rate_all">–</div><div class="k">Reject %</div></div>
+    </div>
+  </section>
+
+  <section class="panel span2">
+    <h2>Trend <span class="note" id="trendnote"></span></h2>
+    <div class="filters" role="group" aria-label="Time window">
+      <span style="color:var(--muted);font-size:12px">Window</span>
+      <button type="button" data-w="60" aria-pressed="false">1 min</button>
+      <button type="button" data-w="300" aria-pressed="true">5 min</button>
+      <button type="button" data-w="900" aria-pressed="false">15 min</button>
+      <button type="button" data-w="3600" aria-pressed="false">1 hour</button>
+      <button type="button" class="linkish" id="toggletable" style="margin-left:auto" aria-expanded="false">Show data table</button>
+    </div>
+    <!-- Two plots sharing an x-axis, never two y-scales on one: a count and a
+         percentage would invent a relationship between the scales. -->
+    <figure>
+      <figcaption><span>Inspections per bucket</span><b id="cap_thr">–</b></figcaption>
+      <div class="chart" id="c_thr">
+        <svg viewBox="0 0 600 84" preserveAspectRatio="none" role="img" aria-labelledby="d1"><desc id="d1">Inspections completed per time bucket.</desc></svg>
+        <div class="tip"></div>
+      </div>
+    </figure>
+    <figure style="margin-bottom:0">
+      <figcaption><span>Reject rate</span><b id="cap_rej">–</b></figcaption>
+      <div class="chart" id="c_rej">
+        <svg viewBox="0 0 600 84" preserveAspectRatio="none" role="img" aria-labelledby="d2"><desc id="d2">Percentage of inspections rejected per time bucket.</desc></svg>
+        <div class="tip"></div>
+      </div>
+    </figure>
+    <div id="seriestable" hidden style="margin-top:12px"></div>
+  </section>
+
+  <section class="panel span2">
+    <h2>Recent inspections <span class="note">select a failed row to see the saved frame</span></h2>
+    <div class="scroll">
+      <table>
+        <caption class="sronly">Most recent inspections, newest first</caption>
+        <thead><tr>
+          <th scope="col">Time</th><th scope="col">Verdict</th><th scope="col">Reason</th>
+          <th scope="col">Class</th><th scope="col">Conf</th><th scope="col">Anom</th>
+          <th scope="col">ms</th><th scope="col">Ejected</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="8" class="empty">waiting for data…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="shot">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:10px">
+    <strong id="shotcap" style="font-size:13px;font-weight:600"></strong>
+    <button type="button" class="linkish" onclick="document.getElementById('shot').close()">Close</button>
+  </div>
+  <img id="shotimg" alt="Saved frame for the selected failed inspection">
+</dialog>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const num = (v,d=0) => (v===null||v===undefined||Number.isNaN(v)) ? "–" : Number(v).toFixed(d);
+const clock = t => new Date(t*1000).toLocaleTimeString();
+const setText = (el,v) => { if (el && el.textContent !== String(v)) el.textContent = v; };
+
+let WINDOW = 300;
+let lastSeries = {points:[]};
+let hovering = false;          // suppress chart redraw while the pointer is on it
+let seriesSig = "", classSig = "", rowSig = "";
+
+/* ---- live stream ------------------------------------------------------
+   Assigned from JS so a reload gets a fresh connection, and so an error can
+   be caught -- a <img src> in markup fails silently and just shows nothing. */
+const live = $("live"), stage = $("stage"), veil = $("veil");
+function connectStream(){
+  stage.classList.remove("is-error");
+  live.src = "/stream?t=" + Date.now();
+}
+live.onerror = () => {
+  stage.classList.add("is-error");
+  veil.textContent = "Stream disconnected. Retrying…";
+  setTimeout(connectStream, 3000);
+};
+connectStream();
+
+/* ---- charts -----------------------------------------------------------
+   Hand-rolled SVG: ~60 points does not justify a charting library, and the
+   page has to load on a Pi over WiFi. Redrawn only when the data changes. */
+const W=600, H=84, PAD_T=7, PAD_B=15;
+function draw(hostId, pts, get, color, fmt){
+  const host=$(hostId), svg=host.querySelector("svg"), tip=host.querySelector(".tip");
+  const n=pts.length;
+  if(!n){ svg.innerHTML=`<text x="${W/2}" y="${H/2}" class="axis" text-anchor="middle">no data in this window</text>`; return; }
+  const vals=pts.map(get), hi=Math.max(1e-9,...vals);
+  const x=i=> n===1 ? W/2 : (i/(n-1))*W;
+  const y=v=> PAD_T+(1-v/hi)*(H-PAD_T-PAD_B);
+  const line=vals.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const base=H-PAD_B, gid=hostId+"_g";
+  svg.innerHTML=`
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity=".28"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="0" y1="${y(hi).toFixed(1)}" x2="${W}" y2="${y(hi).toFixed(1)}" stroke="var(--line)"
+          stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+    <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <path d="${line}L${x(n-1).toFixed(1)},${base}L${x(0).toFixed(1)},${base}Z" fill="url(#${gid})"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"
+          stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <line class="cross" x1="0" y1="${PAD_T}" x2="0" y2="${base}" stroke="${color}" stroke-width="1"
+          opacity="0" vector-effect="non-scaling-stroke"/>
+    <circle class="dot" r="4" fill="${color}" stroke="var(--panel)" stroke-width="2" opacity="0"/>
+    <text class="axis" x="2" y="${(y(hi)-3).toFixed(1)}">${fmt(hi)}</text>
+    <text class="axis" x="0" y="${H-3}">${clock(pts[0].t)}</text>
+    <text class="axis" x="${W}" y="${H-3}" text-anchor="end">${clock(pts[n-1].t)}</text>`;
+  const cross=svg.querySelector(".cross"), dot=svg.querySelector(".dot");
+  host.onpointerenter=()=>{hovering=true};
+  host.onpointermove=ev=>{
+    const r=svg.getBoundingClientRect();
+    const i=Math.max(0,Math.min(n-1,Math.round(((ev.clientX-r.left)/r.width)*(n-1))));
+    const px=x(i), py=y(vals[i]);
+    cross.setAttribute("x1",px); cross.setAttribute("x2",px); cross.setAttribute("opacity",".5");
+    dot.setAttribute("cx",px); dot.setAttribute("cy",py); dot.setAttribute("opacity","1");
+    tip.textContent=`${clock(pts[i].t)} · ${fmt(vals[i])}`;
+    tip.style.left=(px/W*r.width)+"px"; tip.style.top=(py/H*r.height-6)+"px";
+    tip.classList.add("on");
+  };
+  host.onpointerleave=()=>{
+    hovering=false;
+    cross.setAttribute("opacity","0"); dot.setAttribute("opacity","0"); tip.classList.remove("on");
+  };
+}
+
+function renderSeries(d){
+  lastSeries=d;
+  const pts=d.points||[];
+  const sig=pts.length+":"+(pts.length?pts[pts.length-1].t+":"+pts[pts.length-1].n:"");
+  if(sig===seriesSig || hovering) return;      // nothing new, or the user is reading it
+  seriesSig=sig;
+  draw("c_thr",pts,p=>p.n,"var(--mark-thr)",v=>`${Math.round(v)}`);
+  draw("c_rej",pts,p=>p.n?(p.fails/p.n)*100:0,"var(--mark-rej)",v=>`${v.toFixed(0)}%`);
+  const tot=pts.reduce((a,p)=>a+p.n,0), fails=pts.reduce((a,p)=>a+p.fails,0);
+  setText($("cap_thr"), `${tot} inspected`);
+  setText($("cap_rej"), tot?`${(fails/tot*100).toFixed(1)}% of ${tot}`:"–");
+  if(!$("seriestable").hidden) renderTable();
+}
+
+function renderTable(){
+  const pts=lastSeries.points||[];
+  $("seriestable").innerHTML = !pts.length ? '<div class="empty">No data in this window.</div>' : `
+    <table><caption>Inspections and reject rate per bucket</caption>
+    <thead><tr><th scope="col">Bucket</th><th scope="col">Inspected</th><th scope="col">Rejected</th>
+    <th scope="col">Reject rate</th><th scope="col">Avg ms</th></tr></thead><tbody>
+    ${pts.map(p=>`<tr><td>${clock(p.t)}</td><td>${p.n}</td><td>${p.fails}</td>
+      <td>${p.n?(p.fails/p.n*100).toFixed(1):"0.0"}%</td>
+      <td>${Number(p.avg_latency_ms).toFixed(1)}</td></tr>`).join("")}</tbody></table>`;
+}
+$("toggletable").onclick=()=>{
+  const t=$("seriestable"), show=t.hidden;
+  t.hidden=!show;
+  $("toggletable").setAttribute("aria-expanded",String(show));
+  $("toggletable").textContent=show?"Hide data table":"Show data table";
+  if(show) renderTable();
+};
+
+document.querySelectorAll('.filters button[data-w]').forEach(b=>{
+  b.onclick=()=>{
+    WINDOW=Number(b.dataset.w);
+    document.querySelectorAll('.filters button[data-w]').forEach(o=>o.setAttribute("aria-pressed",String(o===b)));
+    seriesSig=""; classSig="";
+    pollStats(); pollSeries();
+  };
+});
+
+/* ---- failure frames --------------------------------------------------- */
+function openShot(id,label){
+  $("shotimg").src=`/failure/${id}`;
+  setText($("shotcap"),label);
+  $("shot").showModal();
+}
+
+/* ---- recent table: patch rows in place, never rebuild ------------------
+   A full innerHTML rebuild every second destroys text selection, scroll
+   position and the row you are reaching for. */
+function renderRows(r){
+  const tb=$("rows");
+  const sig=r.length?String(r[0].id)+":"+r.length:"0";
+  if(sig===rowSig) return;
+  rowSig=sig;
+  if(!r.length){ tb.innerHTML='<tr><td colspan="8" class="empty">no inspections yet</td></tr>'; return; }
+  const frag=document.createDocumentFragment();
+  for(const x of r){
+    const shot = x.verdict==="FAIL" && x.image_path;
+    const tr=document.createElement("tr");
+    if(shot){
+      tr.dataset.id=x.id; tr.tabIndex=0;
+      const label=`${clock(x.ts)} — ${x.reason}`;
+      tr.onclick=()=>openShot(x.id,label);
+      tr.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();openShot(x.id,label);} };
+    }
+    tr.innerHTML=`<td>${clock(x.ts)}</td>
+      <td><span class="badge ${x.verdict}">${x.verdict}</span></td>
+      <td class="reason" title="${x.reason}">${x.reason}</td>
+      <td>${x.defect_class ?? "–"}</td>
+      <td>${x.confidence===null?"–":Number(x.confidence).toFixed(2)}</td>
+      <td>${x.anomaly_score===null?"–":Number(x.anomaly_score).toFixed(2)}</td>
+      <td>${Number(x.latency_ms).toFixed(1)}</td>
+      <td>${x.ejected?"yes":"–"}</td>`;
+    frag.appendChild(tr);
+  }
+  tb.replaceChildren(frag);
+}
+
+function renderClasses(by){
+  const sig=JSON.stringify(by);
+  if(sig===classSig) return;
+  classSig=sig;
+  const host=$("classes"), entries=Object.entries(by);
+  if(!entries.length){ host.innerHTML='<div class="empty">no defects in this window</div>'; return; }
+  const max=Math.max(1,...entries.map(e=>e[1]));
+  host.innerHTML=entries.map(([k,v])=>`
+    <div class="barrow"><span>${k}</span><span class="n">${v}</span>
+      <span class="track"><i style="width:${(v/max*100).toFixed(0)}%"></i></span></div>`).join("");
+}
+
+function renderHealth(h){
+  const c=[];
+  const stale = h.last_frame_age_s!==null && h.last_frame_age_s>5;
+  if(h.running && !stale){ c.push(`<span class="chip good"><i class="dot"></i>inspecting</span>`); stage.classList.remove("is-stalled"); }
+  else {
+    c.push(`<span class="chip bad"><i class="dot"></i><b>${h.running?"stalled":"stopped"}</b></span>`);
+    stage.classList.add("is-stalled");
+    veil.textContent = h.running ? "Pipeline stalled — no new frames." : "Inspection stopped.";
+  }
+  if(h.last_frame_age_s!==null) c.push(`<span class="chip${stale?" warn":""}">last frame <b>${h.last_frame_age_s}s</b></span>`);
+  if(h.soc_temp_c!==null){
+    const cls = h.soc_temp_c>=80?" bad":h.soc_temp_c>=70?" warn":"";
+    c.push(`<span class="chip${cls}">SoC <b>${h.soc_temp_c}°C</b></span>`);
+  }
+  if(h.throttled){
+    const live=Object.entries(h.throttled.now).filter(([,v])=>v).map(([k])=>k.replace(/_/g," "));
+    const past=Object.entries(h.throttled.since_boot).filter(([,v])=>v).map(([k])=>k.replace(/_/g," "));
+    c.push(live.length
+      ? `<span class="chip bad">⚠ throttling: <b>${live.join(", ")}</b></span>`
+      : `<span class="chip good">✓ not throttling</span>`);
+    // Sticky bits are history, not a current fault; reporting them as a problem
+    // is how a healthy Pi gets diagnosed as a broken one.
+    if(past.length) c.push(`<span class="chip" title="Occurred at some point since boot; not a current fault.">since boot: ${past.join(", ")}</span>`);
+  }
+  c.push(`<span class="chip">db <b>${(h.db_bytes/1048576).toFixed(1)} MB</b></span>`);
+  $("health").innerHTML=c.join("");
+}
+
+/* ---- what am I looking at? --------------------------------------------
+   A visitor should not have to read the config to know whether this is a
+   camera or a recording, and what the boxes mean. */
+let srcSig="", legendSig="";
+function renderSource(c){
+  const sig=c.source+"|"+c.actuator;
+  if(sig===srcSig) return;
+  srcSig=sig;
+  const b=$("srcbanner");
+  const replay=/^folder|^video/.test(c.source);
+  const mockAct=c.actuator==="mock";
+  if(!replay && !mockAct){ b.hidden=true; return; }
+  const bits=[];
+  if(replay){
+    const m=c.source.match(/(\d+)\s+images/);
+    bits.push(`<b>Recorded sample images</b>, not a live camera${m?` — ${m[1]} stored frames on a loop`:""}`);
+  }
+  if(mockAct) bits.push("the ejector is <b>simulated</b> and fires nothing");
+  b.innerHTML = "Demonstration mode: " + bits.join(", ") + ".";
+  b.hidden=false;
+}
+function renderLegend(win, all){
+  const names=Object.keys({...(all||{}), ...(win||{})}).sort();
+  const sig=names.join(",");
+  if(sig===legendSig) return;
+  legendSig=sig;
+  const host=$("legend");
+  if(!names.length){ host.innerHTML=""; return; }
+  host.innerHTML = "<span style='color:var(--dim)'>defect types:</span>" +
+    names.map(n=>`<span><i></i>${n.replace(/_/g," ")}</span>`).join("");
+}
+
+/* ---- polling ----------------------------------------------------------
+   Tiered on purpose. The Pi is running inference; four requests a second for
+   data that moves at different speeds is waste. Counters are cheap and move
+   fast; the series re-runs a SQL GROUP BY and moves slowly. */
+async function jget(u){ const r=await fetch(u); if(!r.ok) throw new Error(r.status); return r.json(); }
+let failures=0;
+function ok(){ failures=0; }
+function bad(){
+  if(++failures>=2){
+    $("cfg").innerHTML='<span style="color:var(--fail)">dashboard cannot reach the pipeline</span>';
+    $("health").innerHTML='<span class="chip bad"><i class="dot"></i>unreachable</span>';
+  }
+}
+
+async function pollStats(){
+  try{
+    const s=await jget(`/api/stats?window=${WINDOW}`);
+    setText($("fps"),num(s.live.fps,1)); setText($("lat"),num(s.live.latency_ms,1));
+    setText($("p95"),num(s.window.p95_latency_ms,1));
+    setText($("pass"),s.live.passes); setText($("fail"),s.live.fails); setText($("anom"),s.live.anomaly_calls);
+    setText($("total"),s.database.total.toLocaleString()); setText($("rate_all"),num(s.database.reject_rate,1));
+    const mins = WINDOW>=3600 ? "1 hour" : `${WINDOW/60} min`;
+    setText($("winlabel"),`last ${mins}`);
+    setText($("trendnote"),`last ${mins}, ${s.window.total} inspections`);
+    setText($("srcnote"), s.config.source);
+    renderSource(s.config);
+    renderLegend(s.window.by_class, s.database.by_class);
+    $("cfg").innerHTML =
+      `<span>actuator <b>${s.config.actuator}</b></span>`+
+      `<span>anomaly <b>${s.config.anomaly?"on":"off"}</b></span>`+
+      `<span>conf ≥ <b>${s.config.conf_threshold}</b></span>`+
+      `<span>window reject <b>${num(s.window.reject_rate,1)}%</b></span>`;
+    renderClasses(s.window.by_class||{});
+    ok();
+  }catch(e){ bad(); }
+}
+async function pollRecent(){ try{ renderRows(await jget("/api/recent")); ok(); }catch(e){ bad(); } }
+async function pollSeries(){ try{ renderSeries(await jget(`/api/series?window=${WINDOW}`)); ok(); }catch(e){ bad(); } }
+async function pollHealth(){ try{ renderHealth(await jget("/api/health")); ok(); }catch(e){ bad(); } }
+
+pollStats(); pollRecent(); pollSeries(); pollHealth();
+setInterval(pollStats, 1000);
+setInterval(pollRecent, 2000);
+setInterval(pollSeries, 5000);
+setInterval(pollHealth, 5000);
+// Stop polling when the tab is hidden; a background tab should not keep a Pi busy.
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden){ pollStats(); pollRecent(); pollSeries(); pollHealth(); }
+});
+</script>
+</body>
+</html>

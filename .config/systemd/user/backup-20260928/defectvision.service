@@ -1,0 +1,57 @@
+[Unit]
+Description=DefectVision inspection station (pipeline + dashboard)
+Documentation=file:%h/defectvision/README.md
+After=network-online.target
+Wants=network-online.target
+
+# The other two demos on this Pi. This unit previously declared no conflict at
+# all, which is how it ended up sharing four cores with defect-inspect:
+# 33.9 ms/frame alone against 188 ms with both running. All three units name
+# the other two -- systemd does not infer the reverse direction.
+Conflicts=defect-inspect.service
+
+# Five restarts in five minutes, then give up, rather than respawning forever
+# and burying the real error in a scrolling journal.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/defectvision
+# Port 5001, not 5000: the defect-inspect service already owns 5000 on this
+# host. Conflicts= means they are never up together, but the ports stay
+# distinct so a browser tab survives a switch.
+ExecStart=%h/defectvision/.venv/bin/python -m src.dashboard.app --port 5001
+Restart=on-failure
+RestartSec=5
+
+# --- Shutdown guarantee -----------------------------------------------------
+# The demo must leave nothing behind: no inference threads holding the four
+# cores, no port still bound, no JPEG writer filling the SD card. KillMode is
+# control-group (the default, stated explicitly because this is the whole
+# point): systemd signals every process in the unit's cgroup, not just the one
+# it spawned, so a `uv run` wrapper cannot orphan its child. TimeoutStopSec
+# bounds how long a wedged ONNX session may stall the stop, and FinalKillSignal
+# then removes it unconditionally. Without these three, "closed" means "the
+# main process exited".
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
+FinalKillSignal=SIGKILL
+
+# A requested stop arrives as SIGTERM. `uv run` does not die from it itself --
+# it waits for the child and exits 128+15 -- and systemd would call that a
+# failure. It is not: switching demos is not a crash.
+SuccessExitStatus=143
+
+# Unbuffered, or Python holds log lines in a 4 KB buffer and journalctl shows
+# nothing until the process dies -- exactly when you need the output.
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+# Not enabled at boot. While running this writes an annotated JPEG per defect;
+# the pipeline now caps that directory at 2000 files, but an unattended demo is
+# still a demo nobody is watching.
+[Install]
+WantedBy=default.target

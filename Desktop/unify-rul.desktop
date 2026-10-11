@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=UNIFY-RUL Demo
+Comment=Start the UNIFY-RUL edge dashboard on :8000 (stops the other demos)
+Exec=systemctl --user start unify-rul.service
+Icon=utilities-system-monitor
+Terminal=false
+StartupNotify=false
+Categories=Utility;

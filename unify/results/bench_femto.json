@@ -1,0 +1,66 @@
+{
+  "info": {
+    "platform": "Linux-6.12.93+rpt-rpi-2712-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "processor": "",
+    "onnxruntime": "1.28.0",
+    "providers": [
+      "CPUExecutionProvider"
+    ],
+    "model_sha": "a80c367e596a6517",
+    "thermals_before": {
+      "temp_c": "46.1'C",
+      "throttled": "0x0"
+    },
+    "thermals_after": {
+      "temp_c": "51.0'C",
+      "throttled": "0x0"
+    }
+  },
+  "runs": [
+    {
+      "threads": 1,
+      "iters": 1000,
+      "sensors": 6,
+      "window": 30,
+      "p50_ms": 0.572,
+      "p95_ms": 0.589,
+      "p99_ms": 0.594,
+      "max_ms": 0.684,
+      "mean_ms": 0.574
+    },
+    {
+      "threads": 2,
+      "iters": 1000,
+      "sensors": 6,
+      "window": 30,
+      "p50_ms": 0.522,
+      "p95_ms": 0.54,
+      "p99_ms": 0.545,
+      "max_ms": 0.602,
+      "mean_ms": 0.524
+    },
+    {
+      "threads": 3,
+      "iters": 1000,
+      "sensors": 6,
+      "window": 30,
+      "p50_ms": 0.496,
+      "p95_ms": 0.515,
+      "p99_ms": 0.519,
+      "max_ms": 0.613,
+      "mean_ms": 0.498
+    },
+    {
+      "threads": 4,
+      "iters": 1000,
+      "sensors": 6,
+      "window": 30,
+      "p50_ms": 0.498,
+      "p95_ms": 0.516,
+      "p99_ms": 0.536,
+      "max_ms": 0.577,
+      "mean_ms": 0.501
+    }
+  ]
+}

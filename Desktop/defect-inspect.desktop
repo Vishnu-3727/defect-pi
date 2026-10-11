@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Defect Inspection Demo
+Comment=Start the surface defect inspection demo (stops the other demo)
+# Bare command, no shell: the Exec field escapes ; $ " and ' in odd ways.
+# Conflicts= in the unit file stops the other demo; the :5000 tab stays open.
+Exec=systemctl --user start defect-inspect.service
+Icon=camera-photo
+Terminal=false
+StartupNotify=false
+Categories=Utility;

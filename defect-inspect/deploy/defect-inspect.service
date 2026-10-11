@@ -1,0 +1,49 @@
+[Unit]
+# A demo that needs someone to SSH in and start it by hand is a demo that fails
+# in front of an audience. This runs dashboard/app.py, which starts the
+# inspection pipeline in a background thread and serves the web UI from the
+# same process -- one unit, not two, so they cannot get out of step.
+Description=Real-time surface defect inspection (pipeline and dashboard)
+Documentation=https://github.com/Vishnu-3727/defect-inspect
+After=network-online.target
+Wants=network-online.target
+
+# Two demos share one Pi and are never shown at the same time. Conflicts= makes
+# that mutual exclusion the init system's job: starting unify-rul stops this
+# unit automatically, so there is no way to leave both running and wonder why
+# the frame rate halved. Both units declare it -- systemd does not infer the
+# reverse direction.
+Conflicts=unify-rul.service
+
+# Five restarts in five minutes, then stop trying. Without this a unit that
+# fails at boot -- no camera, missing model -- respawns forever and buries the
+# real error in a scrolling journal.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/defect-inspect
+# --source replays the 60 committed fixture images on a loop, because no camera
+# is attached yet. Delete the --source argument once one is: capture.source is
+# "auto" in configs/default.yaml, which picks picamera2 when it is importable.
+# bench_fixtures rather than data/ because data/ is gitignored and a fresh
+# clone would not have it.
+ExecStart=%h/.local/bin/uv run python dashboard/app.py --source %h/defect-inspect/bench_fixtures/images --loop
+Restart=on-failure
+RestartSec=5
+
+# `uv run` does not die from SIGTERM itself -- it waits for the child, then exits
+# with 128+15. systemd sees a clean exit with a nonzero code and marks the unit
+# failed, which is wrong: a requested stop is not a failure. Without this line
+# every switch to the other demo leaves this unit sitting in `failed`.
+SuccessExitStatus=143
+
+# Unbuffered, or Python holds log lines in a 4 KB buffer and journalctl shows
+# nothing until the process dies -- exactly when you need the output.
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

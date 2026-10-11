@@ -1,0 +1,27 @@
+[Unit]
+# systemd --user unit, not a system unit: same reasons as unify-rul.service.
+Description=UNIFY-RUL simulated sensor feed (fake_node --degrade --loop)
+# Start after the server so /ingest exists, and die with it: BindsTo stops
+# this feed whenever unify-rul.service stops, so the dashboard never shows
+# a live feed with no server behind it.
+After=unify-rul.service
+BindsTo=unify-rul.service
+
+[Service]
+Type=simple
+# Same working-directory rule as unify-rul.service: fake_node.py is resolved
+# relative to edge/, and posts to 127.0.0.1:8000/ingest by default.
+WorkingDirectory=%h/unify/edge
+ExecStart=%h/unify/.venv/bin/python fake_node.py --degrade --loop
+Restart=on-failure
+# The server may not be listening yet on the first try, so retry quickly
+# instead of backing off for the full 5 s the server unit uses.
+RestartSec=3
+
+# Unbuffered, or Python holds log lines in a 4 KB buffer and journalctl shows
+# nothing until the process dies -- same reason as unify-rul.service.
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+# This feed is started only via unify-rul.service's Wants= and must never be enabled.

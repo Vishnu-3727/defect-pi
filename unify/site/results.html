@@ -1,0 +1,440 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNIFY-RUL — Universal Remaining Useful Life Prediction</title>
+    <script src="vendor/tailwind-play.js"></script>
+    <style>
+        :root {
+            --bg: #0b0b0c;
+            --surface: #111113;
+            --fg: #eeeeee;
+            --dim: #888888;
+            --line: #2a2a2e;
+            --ok: #4ade80;
+            --warn: #fbbf24;
+            --bad: #f87171;
+            --accent: #60a5fa;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+            font-variant-numeric: tabular-nums;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .display-text {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(to bottom, var(--surface), var(--bg));
+        }
+
+        .metric-card {
+            border: 1px solid var(--line);
+            padding: 24px;
+            background: var(--surface);
+        }
+
+        .border-line {
+            border: 1px solid var(--line);
+        }
+
+        .border-b-line {
+            border-bottom: 1px solid var(--line);
+        }
+
+        .border-t-line {
+            border-top: 1px solid var(--line);
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reveal {
+                opacity: 1;
+                transform: none;
+                transition: none;
+            }
+        }
+
+        .terminal-block {
+            background: #000;
+            border: 1px solid var(--line);
+            padding: 24px;
+            position: relative;
+        }
+
+        .terminal-prompt::before {
+            content: "$ ";
+            color: var(--dim);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 13px;
+        }
+
+        tr.row-border {
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .num-val {
+            text-align: right;
+        }
+
+        .chip {
+            font-size: 10px;
+            padding: 2px 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:50;background:#0b0b0c;border-bottom:1px solid #2a2a2e;padding:10px 24px;font:13px ui-monospace,Consolas,monospace;">
+  <a href="index.html" style="color:#4ade80;text-decoration:none;">&larr; Run the model live</a>
+  <span style="color:#888;margin-left:12px;">Measured results</span>
+</div>
+    <div class="min-h-screen flex flex-col items-center" data-sd-id="1">
+        <!-- 1. HERO -->
+        <header class="w-full max-w-[1100px] px-6 pt-24 pb-20 hero-gradient" data-sd-id="2">
+            <div class="reveal active" data-sd-id="3">
+                <p class="text-[11px] uppercase tracking-[0.08em] text-[var(--accent)] font-semibold mb-6" data-sd-id="4">Chennai Institute of Technology · ECE Project-Based Learning · AY 2026-27</p>
+                <h1 class="display-text text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-4" data-sd-id="5">Universal Remaining Useful Life Prediction</h1>
+                <h2 class="display-text text-2xl md:text-3xl text-[var(--dim)] font-medium mb-8" data-sd-id="6">Any dataset. Any hardware.</h2>
+                <div class="h-[1px] w-full bg-gradient-to-r from-[var(--ok)] to-[var(--accent)] mb-12" data-sd-id="7"></div>
+                
+                <p class="max-w-3xl text-lg leading-relaxed mb-16" data-sd-id="8">
+                    One 44,417-parameter model, trained jointly across datasets with different sensor counts and different time units, exported to ONNX with a dynamic sensor axis, running on a CPU-only Raspberry Pi 5.
+                </p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" data-sd-id="9">
+                    <div class="metric-card" data-sd-id="10">
+                        <div class="text-[var(--dim)] text-[11px] uppercase tracking-[0.08em] mb-2" data-sd-id="11">Complexity</div>
+                        <div class="text-4xl font-semibold leading-none mb-2" data-sd-id="12">44,417</div>
+                        <div class="text-[var(--dim)] text-[11px]" data-sd-id="13">parameters · one weight set</div>
+                    </div>
+                    <div class="metric-card" data-sd-id="14">
+                        <div class="text-[var(--dim)] text-[11px] uppercase tracking-[0.08em] mb-2" data-sd-id="15">Footprint</div>
+                        <div class="text-4xl font-semibold leading-none mb-2" data-sd-id="16">190 KB</div>
+                        <div class="text-[var(--dim)] text-[11px]" data-sd-id="17">79 KB quantised int8</div>
+                    </div>
+                    <div class="metric-card" data-sd-id="18">
+                        <div class="text-[var(--dim)] text-[11px] uppercase tracking-[0.08em] mb-2" data-sd-id="19">Performance</div>
+                        <div class="text-4xl font-semibold leading-none mb-2" data-sd-id="20">0.42 ms</div>
+                        <div class="text-[var(--dim)] text-[11px]" data-sd-id="21">p50 inference · Pi 5</div>
+                    </div>
+                    <div class="metric-card" data-sd-id="22">
+                        <div class="text-[var(--dim)] text-[11px] uppercase tracking-[0.08em] mb-2" data-sd-id="23">Accuracy</div>
+                        <div class="text-4xl font-semibold leading-none mb-2" data-sd-id="24">14.51</div>
+                        <div class="text-[var(--dim)] text-[11px]" data-sd-id="25">RMSE cycles · C-MAPSS</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 2. THE PROBLEM -->
+        <section class="w-full max-w-[1100px] px-6 py-20 reveal" id="problem" data-sd-id="26">
+            <h3 class="display-text text-3xl font-semibold mb-12" data-sd-id="27">The Problem</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12" data-sd-id="28">
+                <div class="border-line p-6 bg-[var(--surface)]" data-sd-id="29">
+                    <div class="text-[var(--dim)] text-[11px] mb-2 uppercase" data-sd-id="30">Dataset 01</div>
+                    <h4 class="text-lg font-bold mb-4" data-sd-id="31">C-MAPSS</h4>
+                    <ul class="text-sm text-[var(--dim)] space-y-1" data-sd-id="32">
+                        <li data-sd-id="33">21 Sensors</li>
+                        <li data-sd-id="34">Time: Cycles</li>
+                        <li data-sd-id="35">Object: Turbofan</li>
+                    </ul>
+                </div>
+                <div class="border-line p-6 bg-[var(--surface)]" data-sd-id="36">
+                    <div class="text-[var(--dim)] text-[11px] mb-2 uppercase" data-sd-id="37">Dataset 02</div>
+                    <h4 class="text-lg font-bold mb-4" data-sd-id="38">FEMTO/PRONOSTIA</h4>
+                    <ul class="text-sm text-[var(--dim)] space-y-1" data-sd-id="39">
+                        <li data-sd-id="40">15/16 Sensors</li>
+                        <li data-sd-id="41">Time: Seconds</li>
+                        <li data-sd-id="42">Object: Bearing</li>
+                    </ul>
+                </div>
+                <div class="border-line p-6 bg-[var(--surface)]" data-sd-id="43">
+                    <div class="text-[var(--dim)] text-[11px] mb-2 uppercase" data-sd-id="44">Dataset 03</div>
+                    <h4 class="text-lg font-bold mb-4" data-sd-id="45">XJTU-SY</h4>
+                    <ul class="text-sm text-[var(--dim)] space-y-1" data-sd-id="46">
+                        <li data-sd-id="47">15/16 Sensors</li>
+                        <li data-sd-id="48">Time: Minutes</li>
+                        <li data-sd-id="49">Object: Bearing</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-12 text-[var(--dim)] leading-relaxed" data-sd-id="50">
+                <p data-sd-id="51">
+                    A fixed input width forces one model per dataset, preventing shared learning across diverse telemetry sources. Furthermore, mixing raw time units lets whichever dataset has the largest absolute numbers dominate the loss function, destroying convergence on the others.
+                </p>
+                <p data-sd-id="52">
+                    UNIFY-RUL solves this via architecture and target normalization. The model predicts a <span class="text-[var(--fg)]" data-sd-id="53">normalised fraction of life in [0,1]</span>, which is then denormalised back to the native domain (cycles, seconds, or minutes) using a per-dataset <code>life_scale</code>.
+                </p>
+            </div>
+        </section>
+
+        <!-- 3. HOW IT WORKS -->
+        <section class="w-full max-w-[1100px] px-6 py-20 reveal" data-sd-id="54">
+            <h3 class="display-text text-3xl font-semibold mb-12" data-sd-id="55">How it works</h3>
+            
+            <!-- Pipeline Diagram -->
+            <div class="w-full flex flex-wrap items-center justify-between gap-4 mb-16 p-8 border-line bg-[var(--surface)] overflow-x-auto" data-sd-id="56">
+                <div class="px-4 py-2 border-line text-xs whitespace-nowrap" data-sd-id="57">Sensor Windows</div>
+                <div class="text-[var(--dim)]" data-sd-id="58">→</div>
+                <div class="px-4 py-2 border-line text-xs whitespace-nowrap" data-sd-id="59">Shared CNN Encoder</div>
+                <div class="text-[var(--dim)]" data-sd-id="60">→</div>
+                <div class="px-4 py-2 border-line text-xs text-center leading-tight whitespace-nowrap" data-sd-id="61">Masked Cross-Attention<br><span class="text-[10px] opacity-60" data-sd-id="62">over Sensor-ID Embedding</span></div>
+                <div class="text-[var(--dim)]" data-sd-id="63">→</div>
+                <div class="px-4 py-2 border-line text-xs whitespace-nowrap" data-sd-id="64">RUL Head</div>
+                <div class="text-[var(--dim)]" data-sd-id="65">→</div>
+                <div class="px-4 py-2 border-line text-xs text-[var(--ok)] font-bold whitespace-nowrap" data-sd-id="66">ONNX Dynamic Axis</div>
+            </div>
+
+            <div class="grid md:grid-cols-1 gap-8" data-sd-id="67">
+                <table class="border-t-line border-b-line" data-sd-id="68">
+                    <thead data-sd-id="69">
+                        <tr class="text-[var(--dim)] uppercase text-[10px] tracking-widest" data-sd-id="70">
+                            <th class="pb-4" data-sd-id="71">Claim and Test</th>
+                            <th class="pb-4 num-val" data-sd-id="72">Verification Path</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[var(--line)]" data-sd-id="73">
+                        <tr data-sd-id="74">
+                            <td data-sd-id="75">Any sensor count, one weight set</td>
+                            <td class="num-val text-[var(--dim)]" data-sd-id="76">tests/test_shapes.py, S = 2 to 21</td>
+                        </tr>
+                        <tr data-sd-id="77">
+                            <td data-sd-id="78">Survives ONNX export</td>
+                            <td class="num-val text-[var(--dim)]" data-sd-id="79">tests/test_onnx_parity.py, matched within 3e-8</td>
+                        </tr>
+                        <tr data-sd-id="80">
+                            <td data-sd-id="81">No train/test leakage</td>
+                            <td class="num-val text-[var(--dim)]" data-sd-id="82">test_split_is_by_unit_not_by_window</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 4. MEASURED RESULTS -->
+        <section class="w-full max-w-[1100px] px-6 py-20 reveal" data-sd-id="83">
+            <h3 class="display-text text-3xl font-semibold mb-12" data-sd-id="84">Measured Results</h3>
+            
+            <div class="mb-8 overflow-x-auto" data-sd-id="85">
+                <table class="border-t-line border-b-line" data-sd-id="86">
+                    <thead data-sd-id="87">
+                        <tr class="text-[var(--dim)] uppercase text-[10px] tracking-widest" data-sd-id="88">
+                            <th class="pb-4" data-sd-id="89">Model</th>
+                            <th class="pb-4 num-val" data-sd-id="90">RMSE (Cycles)</th>
+                            <th class="pb-4 num-val" data-sd-id="91">MAE (Cycles)</th>
+                            <th class="pb-4 num-val" data-sd-id="92">NASA Score</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[var(--line)]" data-sd-id="93">
+                        <tr class="bg-[var(--surface)]" data-sd-id="94">
+                            <td class="font-bold" data-sd-id="95">UNIFY-RUL</td>
+                            <td class="num-val" data-sd-id="96">14.51</td>
+                            <td class="num-val" data-sd-id="97">9.99</td>
+                            <td class="num-val" data-sd-id="98">3,417</td>
+                        </tr>
+                        <tr data-sd-id="99">
+                            <td class="text-[var(--dim)]" data-sd-id="100">RandomForest baseline</td>
+                            <td class="num-val text-[var(--dim)]" data-sd-id="101">14.41</td>
+                            <td class="num-val text-[var(--dim)]" data-sd-id="102">10.50</td>
+                            <td class="num-val text-[var(--dim)]" data-sd-id="103">N/A</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="border-l-4 border-[var(--ok)] bg-[var(--surface)] p-8 mb-16" data-sd-id="104">
+                <blockquote class="text-lg italic leading-relaxed" data-sd-id="105">
+                    "Read this honestly - the baseline wins on RMSE, by 0.1 cycles, which is noise. The fair statement is that they tie, while the deep model is clearly better on MAE. What the baseline cannot do is take 15, 16 or 21 sensors through one weight set."
+                </blockquote>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8" data-sd-id="106">
+                <div class="space-y-4" data-sd-id="107">
+                    <div class="border-line overflow-hidden bg-[var(--surface)]" data-sd-id="108">
+                        <img src="figures/fig2_pred_vs_true.png" alt="Predicted vs true RUL scatter plot" class="w-full" data-sd-id="109">
+                    </div>
+                    <p class="text-[11px] text-[var(--dim)] italic px-2" data-sd-id="110">
+                        Fig 2. Predicted vs true RUL, 690 official C-MAPSS test engines, one prediction each at the final cycle.
+                    </p>
+                </div>
+                <div class="space-y-4" data-sd-id="111">
+                    <div class="border-line overflow-hidden bg-[var(--surface)]" data-sd-id="112">
+                        <img src="figures/fig4_model_vs_baseline.png" alt="Bar chart comparing model and baseline metrics" class="w-full" data-sd-id="113">
+                    </div>
+                    <p class="text-[11px] text-[var(--dim)] italic px-2" data-sd-id="114">
+                        Fig 4. UNIFY-RUL against the RandomForest baseline. The tie is on RMSE; the win is on MAE.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. ON THE TARGET HARDWARE -->
+        <section class="w-full max-w-[1100px] px-6 py-20 reveal" data-sd-id="115">
+            <h3 class="display-text text-3xl font-semibold mb-4" data-sd-id="116">On the Target Hardware</h3>
+            <p class="text-[var(--dim)] mb-12" data-sd-id="117">Latency is measured on the target. An x86 laptop is not an ARM proxy and its numbers are not in this table.</p>
+
+            <div class="grid lg:grid-cols-3 gap-8 mb-16" data-sd-id="118">
+                <div class="lg:col-span-1" data-sd-id="119">
+                    <table class="border-t-line border-b-line" data-sd-id="120">
+                        <thead data-sd-id="121">
+                            <tr class="text-[var(--dim)] text-[10px] uppercase" data-sd-id="122">
+                                <th class="py-4" data-sd-id="123">Metric (Pi 5)</th>
+                                <th class="py-4 num-val" data-sd-id="124">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[var(--line)]" data-sd-id="125">
+                            <tr data-sd-id="126"><td data-sd-id="127">p50 Latency (4 threads)</td><td class="num-val" data-sd-id="128">0.423 ms</td></tr>
+                            <tr data-sd-id="129"><td data-sd-id="130">p95 Latency</td><td class="num-val" data-sd-id="131">0.441 ms</td></tr>
+                            <tr data-sd-id="132"><td data-sd-id="133">p99 Latency</td><td class="num-val" data-sd-id="134">0.446 ms</td></tr>
+                            <tr data-sd-id="135"><td data-sd-id="136">p50 Latency (1 thread)</td><td class="num-val" data-sd-id="137">0.539 ms</td></tr>
+                            <tr data-sd-id="138"><td data-sd-id="139">Thermals</td><td class="num-val text-[var(--ok)]" data-sd-id="140">46.1 °C</td></tr>
+                            <tr data-sd-id="141"><td data-sd-id="142">Throttle Status</td><td class="num-val" data-sd-id="143">0x0 (None)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="lg:col-span-2 grid sm:grid-cols-2 gap-8" data-sd-id="144">
+                    <div class="space-y-2" data-sd-id="145">
+                        <div class="border-line bg-[var(--surface)]" data-sd-id="146">
+                            <img src="figures/fig5_pi_latency.png" class="w-full" alt="Latency distribution graph" data-sd-id="147">
+                        </div>
+                        <p class="text-[11px] text-[var(--dim)]" data-sd-id="148">Fig 5. Inference latency on the Raspberry Pi 5, 4 threads.</p>
+                    </div>
+                    <div class="space-y-2" data-sd-id="149">
+                        <div class="border-line bg-[var(--surface)]" data-sd-id="150">
+                            <img src="figures/fig9_footprint.png" class="w-full" alt="Model memory footprint graph" data-sd-id="151">
+                        </div>
+                        <p class="text-[11px] text-[var(--dim)]" data-sd-id="152">Fig 9. Model footprint: 190 KB fp32, 79 KB int8.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6" data-sd-id="153">
+                <div class="border-line p-6 bg-[var(--surface)]" data-sd-id="154">
+                    <h5 class="text-[var(--accent)] text-[11px] uppercase mb-2" data-sd-id="155">Efficiency Observation</h5>
+                    <p class="text-sm leading-relaxed" data-sd-id="156">One core is enough — going from 1 thread to 4 buys 0.12 ms on a path where the 1-second feature window costs 1000 ms.</p>
+                </div>
+                <div class="border-line p-6 bg-[var(--surface)]" data-sd-id="157">
+                    <h5 class="text-[var(--accent)] text-[11px] uppercase mb-2" data-sd-id="158">Stability Observation</h5>
+                    <p class="text-sm leading-relaxed" data-sd-id="159">The tail is flat — p99 is 5 percent above p50, because a 44k-parameter model fits in cache and does not thrash.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. WHAT THIS IS NOT -->
+        <section class="w-full max-w-[1100px] px-6 py-20 bg-[#0d0d0f] border-t border-b border-[var(--line)] reveal" data-sd-id="160">
+            <h3 class="display-text text-3xl font-semibold mb-4" data-sd-id="161">What this is not</h3>
+            <p class="text-[var(--dim)] mb-12" data-sd-id="162">Four things this project does not claim</p>
+            
+            <div class="grid md:grid-cols-2 gap-6" data-sd-id="163">
+                <div class="border-line p-8 bg-[var(--surface)]" data-sd-id="164">
+                    <span class="chip bg-[var(--warn)] text-black mb-4 inline-block" data-sd-id="165">Qualitative Constraint</span>
+                    <p class="text-sm leading-relaxed" data-sd-id="166">
+                        FEMTO and XJTU are not downloaded — the three-dataset universality claim is demonstrated on C-MAPSS and synthetic data, not on all three.
+                    </p>
+                </div>
+                <div class="border-line p-8 bg-[var(--surface)]" data-sd-id="167">
+                    <span class="chip bg-[var(--bad)] text-white mb-4 inline-block" data-sd-id="168">Statistical Limitation</span>
+                    <p class="text-sm leading-relaxed" data-sd-id="169">
+                        The live rig has no ground-truth RUL — you cannot run a bearing to destruction in a semester, and one bearing death is one sample.
+                    </p>
+                </div>
+                <div class="border-line p-8 bg-[var(--surface)]" data-sd-id="170">
+                    <span class="chip bg-[var(--bad)] text-white mb-4 inline-block" data-sd-id="171">Sensor Fidelity</span>
+                    <p class="text-sm leading-relaxed" data-sd-id="172">
+                        The MPU-6050 tops out at 1 kHz against the bearing datasets 25.6 kHz — it cannot see the resonances a spall excites.
+                    </p>
+                </div>
+                <div class="border-line p-8 bg-[var(--surface)]" data-sd-id="173">
+                    <span class="chip bg-[var(--warn)] text-black mb-4 inline-block" data-sd-id="174">Domain Gap</span>
+                    <p class="text-sm leading-relaxed" data-sd-id="175">
+                        The Pi runs the synthetic build, not the C-MAPSS model whose accuracy is reported above — a turbofan-trained model fed vibration features would return a number with no meaning.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. REPRODUCE IT -->
+        <section class="w-full max-w-[1100px] px-6 py-20 reveal" data-sd-id="176">
+            <h3 class="display-text text-3xl font-semibold mb-8" data-sd-id="177">Reproduce it</h3>
+            <p class="text-[var(--dim)] mb-6" data-sd-id="178">The entire stack runs on generated run-to-failure data. No downloads, about five minutes.</p>
+            
+            <div class="terminal-block" data-sd-id="179">
+                <div class="flex space-x-2 mb-6" data-sd-id="180">
+                    <div class="w-2 h-2 rounded-full bg-[var(--line)]" data-sd-id="181"></div>
+                    <div class="w-2 h-2 rounded-full bg-[var(--line)]" data-sd-id="182"></div>
+                    <div class="w-2 h-2 rounded-full bg-[var(--line)]" data-sd-id="183"></div>
+                </div>
+                <pre class="text-sm leading-relaxed font-mono" data-sd-id="184"><span class="terminal-prompt" data-sd-id="185">python -m venv .venv</span>
+<span class="terminal-prompt" data-sd-id="186">source .venv/bin/activate</span>
+<span class="terminal-prompt" data-sd-id="187">pip install -r requirements-train.txt</span>
+<span class="terminal-prompt" data-sd-id="188">make smoke</span></pre>
+            </div>
+        </section>
+
+        <!-- 8. FOOTER -->
+        <footer class="w-full max-w-[1100px] px-6 py-24 border-t-line text-[var(--dim)] text-xs" data-sd-id="189">
+            <div class="grid md:grid-cols-2 gap-12" data-sd-id="190">
+                <div class="space-y-4" data-sd-id="191">
+                    <h6 class="text-[var(--fg)] text-sm font-semibold mb-6" data-sd-id="192">Chennai Institute of Technology</h6>
+                    <p data-sd-id="193">Department of Electronics and Communication Engineering</p>
+                    <p data-sd-id="194">Review 1 held 11 July 2026</p>
+                </div>
+                <div class="space-y-4 md:text-right" data-sd-id="195">
+                    <div data-sd-id="196">
+                        <p class="text-[var(--fg)] mb-1" data-sd-id="197">Team</p>
+                        <p data-sd-id="198">Vishnu Vardhan K S (24EC0251)</p>
+                        <p data-sd-id="199">VS Kamlesh (24EC0243)</p>
+                    </div>
+                    <div data-sd-id="200">
+                        <p class="text-[var(--fg)] mb-1" data-sd-id="201">Mentor</p>
+                        <p data-sd-id="202">Mr. Prem Sangeeth</p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Intersection Observer for section fade-in
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
+
+</body></html>

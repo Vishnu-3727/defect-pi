@@ -1,0 +1,23 @@
+{
+  "model": "unify_rul.onnx",
+  "sha256": "a80c367e596a6517e38c8c5b135ecdedfbf1b7225b32f03c3838b1817932a8f6",
+  "opset": 17,
+  "window": 30,
+  "scales": {
+    "cmapss": 125.0
+  },
+  "epoch": 12,
+  "val": {
+    "cmapss": {
+      "rmse": 15.023859977722168,
+      "mae": 9.684176445007324,
+      "nasa": 184404.75,
+      "n": 27668,
+      "scale": 125.0
+    },
+    "mean": {
+      "rmse": 15.023859977722168
+    }
+  },
+  "size_bytes": 194954
+}

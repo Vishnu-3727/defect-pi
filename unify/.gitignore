@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# datasets — never commit 15 GB of bearing CSVs
+data/raw/
+data/interim/
+data/processed/
+
+# runtime
+edge/*.db
+edge/*.db-wal
+edge/*.db-shm
+*.log
+
+# artifacts
+*.pt
+*.onnx
+
+# platformio
+firmware/esp32/.pio/
+*.onnx.data
+
+# The Pi runs these; they are small (<300 KB) and a fresh clone must be able to
+# start the edge dashboard without re-exporting.
+!edge/artifacts/*.onnx
+# Laptop launcher state.
+.pi_last_ip

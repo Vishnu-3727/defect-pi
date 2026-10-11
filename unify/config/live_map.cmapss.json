@@ -1,0 +1,36 @@
+{
+  "_comment": [
+    "Live map for a model trained on C-MAPSS only. Use it when edge/artifacts",
+    "holds the C-MAPSS export:",
+    "",
+    "    UNIFY_LIVE_MAP=../config/live_map.cmapss.json python bench.py --sweep",
+    "    UNIFY_LIVE_MAP=../config/live_map.cmapss.json uvicorn app:app",
+    "",
+    "config/live_map.json points at ref_dataset 'xjtu', which has no statistics in",
+    "a C-MAPSS-only norm_stats.json, so Predictor() refuses to start against it.",
+    "That refusal is correct - normalising with a dataset the model never saw",
+    "would produce a confident number from the wrong constants.",
+    "",
+    "The 15 channels are the informative C-MAPSS sensors, in the order the parser",
+    "emits them: sensor_ids [2,3,4,6,7,8,9,11,12,13,14,15,17,20,21]. The six",
+    "near-constant sensors (1,5,10,16,18,19) are dropped upstream in the parser.",
+    "domain_id 0 matches the value in the cached units' meta."
+  ],
+
+  "ref_dataset": "cmapss",
+  "domain_id": 0,
+
+  "condition": "0",
+
+  "channels": [
+    "cmapss/s2", "cmapss/s3", "cmapss/s4", "cmapss/s6", "cmapss/s7",
+    "cmapss/s8", "cmapss/s9", "cmapss/s11", "cmapss/s12", "cmapss/s13",
+    "cmapss/s14", "cmapss/s15", "cmapss/s17", "cmapss/s20", "cmapss/s21"
+  ],
+
+  "alarm": {
+    "ewma_alpha": 0.3,
+    "threshold": 0.30,
+    "consecutive": 5
+  }
+}

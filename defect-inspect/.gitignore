@@ -1,0 +1,38 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+
+# Ultralytics downloads COCO-pretrained weights into the repo root on first
+# train. They are 11 MB of upstream artefact, not project output.
+/yolo*.pt
+models/*.pt
+models/*.onnx
+models/*.npz
+models/calib/
+
+# Committed on purpose: the ARM CI runner has neither the dataset nor the
+# training environment, so the benchmark needs a model and frames in the repo.
+# 5.6 MB and 884 KB respectively -- small enough to version, large enough to
+# make the ARM measurement real.
+!models/model_int8.onnx
+!models/model.onnx
+# The anomaly module needs both of these at runtime. Without them a fresh
+# clone starts in the degraded no-PatchCore mode, which is a silent
+# downgrade rather than an error, so they are versioned too.
+!models/patchcore_backbone.onnx
+!models/patchcore_bank.npz
+runs/
+reports/*.png
+reports/*.csv
+*.db
+*.sqlite3
+.uv-cache/
+
+# Runtime output from the demo, not source.
+reports/failures/
+*.db-wal
+*.db-shm
+# Old model snapshot kept on the Pi only.
+models/v1-*/
+.pi_last_ip
